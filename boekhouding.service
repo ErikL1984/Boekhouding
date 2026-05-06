@@ -1,0 +1,28 @@
+[Unit]
+Description=Privé Boekhoudprogramma
+After=network.target
+
+[Service]
+Type=simple
+# Pas dit pad aan naar de installatiemap
+WorkingDirectory=/opt/boekhouding
+ExecStart=/opt/boekhouding/venv/bin/python3 /opt/boekhouding/backend/app.py
+Environment=PORT=5000
+Environment=DEBUG=false
+Environment=DB_PATH=/opt/boekhouding/data/boekhouding.db
+
+# Herstart automatisch bij crash
+Restart=always
+RestartSec=5
+
+# Beveiligingsinstellingen
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Log naar systemd journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=boekhouding
+
+[Install]
+WantedBy=multi-user.target

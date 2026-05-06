@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privé Boekhouding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:    #0f1e35;
+  --navy2:   #162844;
+  --navy3:   #1e3558;
+  --blue:    #2563eb;
+  --blue-l:  #3b82f6;
+  --teal:    #0d9488;
+  --teal-l:  #14b8a6;
+  --amber:   #d97706;
+  --red:     #dc2626;
+  --green:   #16a34a;
+  --slate:   #64748b;
+  --slate-l: #94a3b8;
+  --border:  rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text:    #e2e8f0;
+  --text2:   #94a3b8;
+  --text3:   #64748b;
+  --card:    rgba(22,40,68,0.85);
+  --card2:   rgba(30,53,88,0.6);
+  --input:   rgba(15,30,53,0.9);
+  --radius:  10px;
+  --radius2: 6px;
+  --shadow:  0 4px 24px rgba(0,0,0,0.4);
+  --font:    'DM Sans', sans-serif;
+  --mono:    'JetBrains Mono', monospace;
+  --serif:   'DM Serif Display', serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--font);
+  background: var(--navy);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── BACKGROUND ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 10% 0%, rgba(37,99,235,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(13,148,136,0.10) 0%, transparent 60%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ── LOGIN ── */
+#login-screen {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; background: var(--navy);
+}
+.login-box {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 48px 40px;
+  width: 380px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+}
+.login-logo {
+  font-family: var(--serif);
+  font-size: 1.8rem;
+  color: var(--text);
+  margin-bottom: 6px;
+  letter-spacing: -0.02em;
+}
+.login-sub {
+  color: var(--text2);
+  font-size: 0.85rem;
+  margin-bottom: 32px;
+}
+.login-box h2 { font-size: 1rem; font-weight: 500; margin-bottom: 20px; color: var(--text2); }
+
+/* ── LAYOUT ── */
+#app { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: var(--navy2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; bottom: 0;
+  z-index: 10;
+}
+.sidebar-logo {
+  padding: 22px 20px 18px;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.sidebar-logo span { color: var(--teal-l); }
+.nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+.nav-section {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 16px 20px 6px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px;
+  color: var(--text2);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+  font-size: 0.88rem;
+  font-weight: 400;
+  user-select: none;
+}
+.nav-item:hover { background: var(--card2); color: var(--text); }
+.nav-item.active {
+  background: rgba(37,99,235,0.12);
+  color: var(--blue-l);
+  border-left-color: var(--blue-l);
+  font-weight: 500;
+}
+.nav-item .icon { width: 18px; text-align: center; font-size: 0.95rem; opacity: 0.8; }
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--text3);
+}
+.sidebar-user { font-weight: 500; color: var(--text2); margin-bottom: 4px; font-size: 0.83rem; }
+.btn-logout {
+  background: none; border: none;
+  color: var(--text3); cursor: pointer;
+  font-size: 0.78rem; padding: 0;
+  font-family: var(--font);
+}
+.btn-logout:hover { color: var(--red); }
+
+/* ── MAIN ── */
+.main {
+  margin-left: 220px;
+  flex: 1;
+  display: flex; flex-direction: column;
+  min-height: 100vh;
+}
+.topbar {
+  background: var(--navy2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.page-title {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+.topbar-actions { display: flex; gap: 8px; align-items: center; }
+.content { padding: 24px 28px; flex: 1; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+.card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-title { font-weight: 600; font-size: 0.9rem; }
+.card-body { padding: 20px; }
+
+/* ── STAT CARDS ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+}
+.stat-card.blue::before { background: var(--blue); }
+.stat-card.teal::before { background: var(--teal); }
+.stat-card.amber::before { background: var(--amber); }
+.stat-card.red::before { background: var(--red); }
+.stat-card.green::before { background: var(--green); }
+.stat-label { font-size: 0.75rem; color: var(--text2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-value { font-family: var(--mono); font-size: 1.4rem; font-weight: 500; }
+.stat-value.pos { color: var(--teal-l); }
+.stat-value.neg { color: var(--red); }
+.stat-sub { font-size: 0.72rem; color: var(--text3); margin-top: 4px; }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius2);
+  border: none; cursor: pointer;
+  font-size: 0.83rem; font-weight: 500;
+  font-family: var(--font);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-secondary { background: var(--card2); color: var(--text); border: 1px solid var(--border2); }
+.btn-secondary:hover { background: var(--navy3); }
+.btn-success { background: var(--teal); color: #fff; }
+.btn-success:hover { background: #0f766e; }
+.btn-danger { background: rgba(220,38,38,0.15); color: var(--red); border: 1px solid rgba(220,38,38,0.3); }
+.btn-danger:hover { background: rgba(220,38,38,0.25); }
+.btn-sm { padding: 5px 10px; font-size: 0.78rem; }
+.btn-xs { padding: 3px 8px; font-size: 0.72rem; }
+.btn-icon { padding: 6px 8px; }
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn-gb { background: var(--navy3); border: 1px solid var(--border2); color: var(--text); padding: 10px 14px; border-radius: var(--radius2); cursor: pointer; font-size: 0.83rem; font-family: var(--font); transition: all 0.15s; text-align: left; }
+.btn-gb:hover { border-color: var(--blue-l); color: var(--blue-l); background: rgba(37,99,235,0.08); }
+.btn-gb.afwijkend { border-color: var(--amber); color: var(--amber); background: rgba(217,119,6,0.08); }
+
+/* ── FORMS ── */
+.form-group { margin-bottom: 16px; }
+.form-row { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+.form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+label { display: block; font-size: 0.78rem; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+input, select, textarea {
+  width: 100%;
+  background: var(--input);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  border-radius: var(--radius2);
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  font-family: var(--font);
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--blue-l); }
+input.mono { font-family: var(--mono); font-size: 0.83rem; }
+select option { background: var(--navy2); }
+.help-text { font-size: 0.72rem; color: var(--text3); margin-top: 4px; }
+.form-error { color: var(--red); font-size: 0.78rem; margin-top: 4px; }
+
+/* ── TABLES ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+thead th {
+  text-align: left;
+  padding: 10px 14px;
+  font-weight: 600; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text3);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.1s; }
+tbody tr:hover { background: rgba(255,255,255,0.03); }
+tbody td { padding: 10px 14px; color: var(--text2); vertical-align: middle; }
+tbody td.bold { color: var(--text); font-weight: 500; }
+tbody td.mono { font-family: var(--mono); font-size: 0.8rem; }
+tbody td.pos { color: var(--teal-l); font-family: var(--mono); }
+tbody td.neg { color: var(--red); font-family: var(--mono); }
+tbody td.actions { white-space: nowrap; }
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.badge-blue { background: rgba(37,99,235,0.2); color: var(--blue-l); }
+.badge-teal { background: rgba(13,148,136,0.2); color: var(--teal-l); }
+.badge-amber { background: rgba(217,119,6,0.2); color: #fbbf24; }
+.badge-red { background: rgba(220,38,38,0.2); color: #f87171; }
+.badge-gray { background: rgba(100,116,139,0.2); color: var(--slate-l); }
+
+/* ── TABS ── */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab {
+  padding: 10px 18px;
+  font-size: 0.83rem; font-weight: 500;
+  color: var(--text2); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  font-family: var(--font);
+  background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--blue-l); border-bottom-color: var(--blue-l); }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.15s;
+}
+.modal {
+  background: var(--navy2);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  width: 560px; max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+  animation: slideUp 0.2s;
+}
+.modal.modal-lg { width: 780px; }
+.modal.modal-xl { width: 960px; }
+.modal-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title { font-weight: 600; font-size: 0.95rem; }
+.modal-close { background: none; border: none; color: var(--text3); font-size: 1.2rem; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+.modal-close:hover { color: var(--text); background: var(--card2); }
+.modal-body { padding: 22px; }
+.modal-footer { padding: 16px 22px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── TOAST ── */
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 12px 18px;
+  border-radius: var(--radius2);
+  font-size: 0.83rem;
+  box-shadow: var(--shadow);
+  animation: slideInRight 0.2s;
+  max-width: 320px;
+  display: flex; align-items: center; gap: 10px;
+}
+.toast.success { background: rgba(22,163,74,0.9); color: #fff; border: 1px solid rgba(22,163,74,0.5); }
+.toast.error { background: rgba(220,38,38,0.9); color: #fff; border: 1px solid rgba(220,38,38,0.5); }
+.toast.info { background: var(--navy3); color: var(--text); border: 1px solid var(--border2); }
+
+/* ── IMPORT DROP ZONE ── */
+.drop-zone {
+  border: 2px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--blue-l);
+  background: rgba(37,99,235,0.05);
+}
+.drop-zone-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5; }
+.drop-zone-text { color: var(--text2); font-size: 0.88rem; }
+.drop-zone-sub { color: var(--text3); font-size: 0.75rem; margin-top: 6px; }
+
+/* ── RAPPORTAGE TABEL ── */
+.rapport-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.rapport-table th {
+  background: var(--navy3);
+  padding: 8px 12px;
+  text-align: right;
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: var(--text2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.rapport-table th:first-child { text-align: left; width: 200px; }
+.rapport-table td {
+  padding: 7px 12px;
+  border: 1px solid rgba(255,255,255,0.04);
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text2);
+}
+.rapport-table td:first-child { text-align: left; font-family: var(--font); color: var(--text); }
+.rapport-table tr.groep-header td {
+  background: var(--navy3);
+  color: var(--text);
+  font-weight: 600;
+  font-family: var(--font);
+  font-size: 0.8rem;
+}
+.rapport-table tr.subtotaal td {
+  background: rgba(37,99,235,0.06);
+  font-weight: 600;
+  color: var(--text);
+  border-top: 1px solid var(--border2);
+}
+.rapport-table tr.totaal td {
+  background: rgba(37,99,235,0.12);
+  font-weight: 700;
+  color: var(--blue-l);
+  font-size: 0.82rem;
+}
+.rapport-table .pos { color: var(--teal-l); }
+.rapport-table .neg { color: var(--red); }
+
+/* ── HANDMATIG BOEKEN ── */
+.boek-wachtrij { display: flex; flex-direction: column; gap: 12px; }
+.trans-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.trans-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.trans-bedrag { font-family: var(--mono); font-size: 1.1rem; font-weight: 500; }
+.trans-meta { font-size: 0.75rem; color: var(--text3); }
+.trans-naam { font-weight: 500; font-size: 0.88rem; margin-bottom: 2px; }
+.trans-omschr { font-size: 0.78rem; color: var(--text2); }
+.trans-datum { font-size: 0.72rem; color: var(--text3); font-family: var(--mono); }
+.gb-knoppen { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+/* ── SPLIT INTERFACE ── */
+.split-regels { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.split-regel { display: grid; grid-template-columns: 1fr 130px 32px; gap: 8px; align-items: center; }
+.split-rest { font-family: var(--mono); font-size: 0.83rem; padding: 8px 12px; background: var(--navy3); border-radius: var(--radius2); display: flex; justify-content: space-between; align-items: center; }
+.split-rest .label { color: var(--text2); font-size: 0.75rem; font-family: var(--font); }
+.split-rest .waarde { font-weight: 600; }
+
+/* ── BUDGET GRID ── */
+.budget-grid { overflow-x: auto; }
+.budget-tabel { min-width: 900px; }
+.budget-tabel td input {
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  font-family: var(--mono);
+  text-align: right;
+  width: 80px;
+  color: var(--text);
+}
+.budget-tabel td input:focus { border-color: var(--blue-l); outline: none; }
+
+/* ── BALANS ── */
+.balans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.balans-section { }
+.balans-groep { margin-bottom: 16px; }
+.balans-groep-naam { font-weight: 600; font-size: 0.83rem; color: var(--text); padding: 6px 0; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.balans-regel { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.83rem; }
+.balans-regel .naam { color: var(--text2); }
+.balans-regel .bedrag { font-family: var(--mono); color: var(--text); font-size: 0.8rem; }
+.balans-totaal { display: flex; justify-content: space-between; padding: 8px 0; border-top: 2px solid var(--border2); font-weight: 600; margin-top: 8px; }
+.balans-totaal .bedrag { font-family: var(--mono); color: var(--blue-l); }
+
+/* ── EMPTY STATE ── */
+.empty { text-align: center; padding: 48px 24px; color: var(--text3); }
+.empty-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.4; }
+.empty-text { font-size: 0.88rem; }
+
+/* ── LOADING ── */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--blue-l);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+}
+.loading-overlay {
+  position: absolute; inset: 0;
+  background: rgba(15,30,53,0.7);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius);
+  z-index: 5;
+}
+
+/* ── RAPPORTAGE MODUS KNOPPEN ── */
+.modus-knoppen { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
+.modus-btn {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: none;
+  color: var(--text2);
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s;
+}
+.modus-btn:hover { border-color: var(--blue-l); color: var(--blue-l); }
+.modus-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+/* ── UTILITIES ── */
+.flex { display: flex; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-20 { margin-bottom: 20px; }
+.mb-24 { margin-bottom: 24px; }
+.text-sm { font-size: 0.78rem; }
+.text-xs { font-size: 0.72rem; }
+.text-muted { color: var(--text2); }
+.text-faint { color: var(--text3); }
+.text-mono { font-family: var(--mono); }
+.text-right { text-align: right; }
+.hidden { display: none !important; }
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+.tag { display: inline-block; padding: 1px 7px; background: var(--navy3); border-radius: 4px; font-size: 0.72rem; color: var(--text2); }
+
+@keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+@keyframes slideUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
+@keyframes slideInRight { from { opacity:0; transform:translateX(24px) } to { opacity:1; transform:translateX(0) } }
+@keyframes spin { to { transform: rotate(360deg) } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Privé<span>Boek</span></div>
+    <div class="login-sub">Persoonlijke financiële administratie</div>
+    <div class="form-group">
+      <label>Gebruikersnaam</label>
+      <input id="login-user" type="text" placeholder="gebruikersnaam" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Wachtwoord</label>
+      <input id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div id="login-error" class="form-error" style="margin-bottom:12px"></div>
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Inloggen</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <nav class="sidebar">
+    <div class="sidebar-logo">Privé<span>Boek</span></div>
+    <div class="nav">
+      <div class="nav-section">Overzicht</div>
+      <div class="nav-item" onclick="nav('dashboard')"><span class="icon">◈</span> Dashboard</div>
+
+      <div class="nav-section">Transacties</div>
+      <div class="nav-item" onclick="nav('import')"><span class="icon">⬆</span> Importeren</div>
+      <div class="nav-item" onclick="nav('wachtrij')"><span class="icon">⏳</span> Te boeken <span id="wachtrij-badge" class="badge badge-amber" style="margin-left:auto"></span></div>
+      <div class="nav-item" onclick="nav('transacties')"><span class="icon">≡</span> Alle transacties</div>
+
+      <div class="nav-section">Rapportages</div>
+      <div class="nav-item" onclick="nav('balans')"><span class="icon">⚖</span> Balans</div>
+      <div class="nav-item" onclick="nav('wenv')"><span class="icon">📊</span> W&V Rekening</div>
+      <div class="nav-item" onclick="nav('maand')"><span class="icon">📅</span> Maandoverzicht</div>
+
+      <div class="nav-section">Beheer</div>
+      <div class="nav-item" onclick="nav('grootboeken')"><span class="icon">📒</span> Grootboeken</div>
+      <div class="nav-item" onclick="nav('bankrekeningen')"><span class="icon">🏦</span> Bankrekeningen</div>
+      <div class="nav-item" onclick="nav('matchregels')"><span class="icon">⚡</span> Matchregels</div>
+      <div class="nav-item" onclick="nav('budgetten')"><span class="icon">🎯</span> Budgetten</div>
+      <div class="nav-item beheerder-only" onclick="nav('openingsbalans')"><span class="icon">🔑</span> Openingsbalans</div>
+      <div class="nav-item beheerder-only" onclick="nav('gebruikers')"><span class="icon">👥</span> Gebruikers</div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sidebar-user" id="sidebar-username"></div>
+      <div id="sidebar-rol" class="text-xs text-faint" style="margin-bottom:6px"></div>
+      <button class="btn-logout" onclick="doLogout()">↩ Uitloggen</button>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </div>
+    <div class="content" id="main-content"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<div id="modal-root"></div>
+
+<script>
+// ════════════════════════════════════════════
+// STATE & API
+// ════════════════════════════════════════════
+const S = { token: null, gebruiker: null, huidigePagina: null };
+
+async function api(method, path, body=null, isFile=false) {
+  const opts = {
+    method,
+    headers: { 'X-Session-Token': S.token || '' }
+  };
+  if (body && !isFile) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  } else if (isFile) {
+    opts.body = body;
+  }
+  try {
+    const r = await fetch('/api' + path, opts);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    return data;
+  } catch(e) {
+    throw e;
+  }
+}
+
+const get  = (p) => api('GET', p);
+const post = (p, b) => api('POST', p, b);
+const put  = (p, b) => api('PUT', p, b);
+const del  = (p)    => api('DELETE', p);
+
+// ════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════
+async function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  document.getElementById('login-error').textContent = '';
+  try {
+    const r = await post('/login', { gebruikersnaam: u, wachtwoord: p });
+    S.token = r.token;
+    const profiel = await get('/profiel');
+    S.gebruiker = profiel;
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('sidebar-username').textContent = profiel.gebruikersnaam;
+    document.getElementById('sidebar-rol').textContent = profiel.rol === 'beheerder' ? '👑 Beheerder' : 'Gebruiker';
+    // Toon/verberg beheerder items
+    if (profiel.rol !== 'beheerder') {
+      document.querySelectorAll('.beheerder-only').forEach(el => el.classList.add('hidden'));
+    }
+    nav('dashboard');
+    refreshWachtrijBadge();
+  } catch(e) {
+    document.getElementById('login-error').textContent = e.message;
+  }
+}
+
+async function doLogout() {
+  try { await post('/logout'); } catch(e) {}
+  S.token = null; S.gebruiker = null;
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-pass').value = '';
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ════════════════════════════════════════════
+// NAVIGATIE
+// ════════════════════════════════════════════
+const PAGINA_TITELS = {
+  dashboard: 'Dashboard', import: 'Importeren', wachtrij: 'Te boeken',
+  transacties: 'Alle transacties', balans: 'Balans', wenv: 'Winst & Verlies',
+  maand: 'Maandoverzicht', grootboeken: 'Grootboekrekeningen', bankrekeningen: 'Bankrekeningen',
+  matchregels: 'Matchregels', budgetten: 'Budgetten', openingsbalans: 'Openingsbalans',
+  gebruikers: 'Gebruikersbeheer'
+};
+
+const PAGINA_RENDERERS = {
+  dashboard: renderDashboard, import: renderImport, wachtrij: renderWachtrij,
+  transacties: renderTransacties, balans: renderBalans, wenv: renderWenv,
+  maand: renderMaand, grootboeken: renderGrootboeken, bankrekeningen: renderBankrekeningen,
+  matchregels: renderMatchregels, budgetten: renderBudgetten, openingsbalans: renderOpeningsbalans,
+  gebruikers: renderGebruikers
+};
+
+function nav(pagina) {
+  S.huidigePagina = pagina;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => {
+    if (el.getAttribute('onclick') && el.getAttribute('onclick').includes(`'${pagina}'`)) {
+      el.classList.add('active');
+    }
+  });
+  document.getElementById('topbar-title').textContent = PAGINA_TITELS[pagina] || pagina;
+  document.getElementById('topbar-actions').innerHTML = '';
+  document.getElementById('main-content').innerHTML = '<div class="flex-center" style="padding:60px"><div class="spinner"></div></div>';
+  PAGINA_RENDERERS[pagina]?.();
+}
+
+// ════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════
+function euro(n) {
+  if (n === null || n === undefined) return '—';
+  return (n < 0 ? '−' : '') + '€\u202f' + Math.abs(n).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function euroClass(n) { return n > 0 ? 'pos' : n < 0 ? 'neg' : ''; }
+function datumNL(s) { if (!s) return ''; const [y,m,d] = s.split('-'); return `${d}-${m}-${y}`; }
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toast(msg, type='info', duur=3500) {
+  const ic = { success:'✓', error:'✕', info:'ℹ' }[type];
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${ic}</span><span>${escHtml(msg)}</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), duur);
+}
+
+function openModal(html, groot='') {
+  closeModal();
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay'; ov.id = 'modal-overlay';
+  ov.innerHTML = `<div class="modal ${groot}" id="modal-box">${html}</div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) closeModal(); });
+  document.getElementById('modal-root').appendChild(ov);
+}
+function closeModal() {
+  const ov = document.getElementById('modal-overlay');
+  if (ov) ov.remove();
+}
+
+function setContent(html) {
+  document.getElementById('main-content').innerHTML = html;
+}
+
+async function refreshWachtrijBadge() {
+  try {
+    const rows = await get('/transacties?status=nieuw&limit=1');
+    // We need count
+    const all = await get('/transacties?status=nieuw&limit=200');
+    const badge = document.getElementById('wachtrij-badge');
+    badge.textContent = all.length > 0 ? all.length : '';
+  } catch(e) {}
+}
+
+function isBeheerder() { return S.gebruiker?.rol === 'beheerder'; }
+
+// ════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════
+async function renderDashboard() {
+  try {
+    const [saldi, wachtrij, maandData] = await Promise.all([
+      get('/rapportages/saldi'),
+      get('/transacties?status=nieuw&limit=200'),
+      get('/rapportages/wenv?jaar=' + new Date().getFullYear())
+    ]);
+
+    const banksaldo = saldi.filter(g => g.is_bankrekening).reduce((s,g) => s + g.saldo, 0);
+    const netto = maandData.netto;
+
+    setContent(`
+      <div class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-label">Totaal banksaldo</div>
+          <div class="stat-value ${banksaldo >= 0 ? 'pos' : 'neg'}">${euro(banksaldo)}</div>
+          <div class="stat-sub">Alle rekeningen gecombineerd</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">Te boeken</div>
+          <div class="stat-value">${wachtrij.length}</div>
+          <div class="stat-sub">Transacties wachten op boeking</div>
+        </div>
+        <div class="stat-card ${netto >= 0 ? 'green' : 'red'}">
+          <div class="stat-label">Netto dit jaar</div>
+          <div class="stat-value ${euroClass(netto)}">${euro(netto)}</div>
+          <div class="stat-sub">Inkomsten minus uitgaven</div>
+        </div>
+        <div class="stat-card teal">
+          <div class="stat-label">Inkomsten dit jaar</div>
+          <div class="stat-value pos">${euro(maandData.totaal_inkomsten)}</div>
+          <div class="stat-sub">W&V ${new Date().getFullYear()}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Bankrekening saldi</span></div>
+          <div class="card-body">
+            ${saldi.filter(g=>g.is_bankrekening).map(g => `
+              <div class="balans-regel">
+                <span class="naam">${escHtml(g.rekening_naam || g.omschrijving)}</span>
+                <span class="bedrag ${euroClass(g.saldo)}">${euro(g.saldo)}</span>
+              </div>
+            `).join('') || '<div class="text-faint text-sm">Geen bankrekeningen geconfigureerd</div>'}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Laatste transacties</span>
+            <button class="btn btn-secondary btn-sm" onclick="nav('wachtrij')">Alle te boeken →</button>
+          </div>
+          <div class="card-body" style="padding:0">
+            ${wachtrij.slice(0,5).map(t => `
+              <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div class="text-sm" style="color:var(--text)">${escHtml(t.naam_tegenpartij || '—')}</div>
+                  <div class="text-xs text-faint">${datumNL(t.datum)}</div>
+                </div>
+                <span class="text-mono text-sm ${t.bedrag < 0 ? 'neg' : 'pos'}">${euro(t.bedrag)}</span>
+              </div>
+            `).join('') || '<div class="empty"><div class="empty-icon">✓</div><div class="empty-text">Alles geboekt!</div></div>'}
+          </div>
+        </div>
+      </div>
+    `);
+  } catch(e) {
+    setContent(`<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`);
+  }
+}
+
+// ════════════════════════════════════════════
+// IMPORT
+// ════════════════════════════════════════════
+function renderImport() {
+  setContent(`
+    <div class="card" style="max-width:600px">
+      <div class="card-header"><span class="card-title">Rabobank CSV importeren</span></div>
+      <div class="card-body">
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+          <div class="drop-zone-icon">📂</div>
+          <div class="drop-zone-text">Klik of sleep een CSV-bestand hierheen</div>
+          <div class="drop-zone-sub">Rabobank standaard CSV-export (.csv)</div>
+        </div>
+        <input type="file" id="file-input" accept=".csv" class="hidden" onchange="handleFileSelect(this)">
+        <div id="import-resultaat" style="margin-top:16px"></div>
+      </div>
+    </div>
+  `);
+
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) verwerkImportBestand(file);
+  });
+}
+
+function handleFileSelect(input) {
+  if (input.files[0]) verwerkImportBestand(input.files[0]);
+}
+
+async function verwerkImportBestand(bestand) {
+  const res = document.getElementById('import-resultaat');
+  res.innerHTML = '<div class="flex-center" style="padding:20px"><div class="spinner"></div><span style="margin-left:10px;color:var(--text2)">Importeren...</span></div>';
+  try {
+    const fd = new FormData();
+    fd.append('bestand', bestand);
+    const r = await api('POST', '/import', fd, true);
+    res.innerHTML = `
+      <div class="card">
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+            ${statMini('Nieuw', r.nieuw, 'blue')}
+            ${statMini('Overgeslagen', r.overgeslagen, 'gray')}
+            ${statMini('Auto geboekt', r.auto_geboekt, 'teal')}
+            ${statMini('Handmatig', r.handmatig, 'amber')}
+          </div>
+          ${r.fouten && r.fouten.length > 0 ? `
+            <div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:6px;padding:12px">
+              <div class="text-sm" style="color:var(--red);margin-bottom:6px;font-weight:600">Fouten (${r.fouten.length})</div>
+              ${r.fouten.slice(0,10).map(f => `<div class="text-xs text-faint">${escHtml(f)}</div>`).join('')}
+            </div>
+          ` : ''}
+          ${r.handmatig > 0 ? `<button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="nav('wachtrij')">→ Ga naar wachtrij (${r.handmatig} te boeken)</button>` : ''}
+        </div>
+      </div>
+    `;
+    refreshWachtrijBadge();
+    toast(`Import klaar: ${r.nieuw} nieuw, ${r.auto_geboekt} automatisch geboekt`, 'success');
+  } catch(e) {
+    res.innerHTML = `<div class="form-error">Fout: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function statMini(label, waarde, kleur) {
+  return `<div class="stat-card ${kleur}" style="padding:12px 14px"><div class="stat-label">${label}</div><div class="stat-value" style="font-size:1.2rem">${waarde}</div></div>`;
+}
+
+// ════════════════════════════════════════════
+// WACHTRIJ (handmatig boeken)
+// ════════════════════════════════════════════
+async function renderWachtrij() {
+  try {
+    const [transacties, grootboeken] = await Promise.all([
+      get('/transacties?status=nieuw&limit=100'),
+      get('/grootboeken')
+    ]);
+
+    const gbWenv = grootboeken.filter(g => g.categorie === 'Winst en Verlies');
+
+    if (transacties.length === 0) {
+      setContent(`<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Geen openstaande transacties — alles is geboekt!</div></div>`);
+      return;
+    }
+
+    document.getElementById('topbar-actions').innerHTML = `<span class="text-sm text-muted">${transacties.length} transactie(s) te boeken</span>`;
+
+    setContent(`
+      <div class="boek-wachtrij" id="boek-wachtrij">
+        ${transacties.map(t => renderTransCard(t, gbWenv)).join('')}
+      </div>
+    `);
+  } catch(e) {
+    setContent(`<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`);
+  }
+}
+
+function renderTransCard(t, gbLijst) {
+  const kleur = t.bedrag < 0 ? 'neg' : 'pos';
+  const knoppen = gbLijst.map(gb => `
+    <button class="btn-gb" onclick="boekSnel(${t.id}, ${gb.id}, '${escHtml(gb.omschrijving)}')">
+      <div style="font-size:0.72rem;color:var(--text3)">${escHtml(gb.nummer)}</div>
+      <div>${escHtml(gb.omschrijving)}</div>
+    </button>
+  `).join('');
+
+  return `
+    <div class="trans-card" id="tc-${t.id}">
+      <div class="trans-card-header">
+        <div>
+          <div class="trans-naam">${escHtml(t.naam_tegenpartij || '(geen naam)')}</div>
+          <div class="trans-omschr">${escHtml(t.omschrijving_1 || '')}</div>
+          <div class="trans-datum">${datumNL(t.datum)} · ${escHtml(t.rekening_naam || t.iban)}</div>
+        </div>
+        <div class="trans-bedrag ${kleur}">${euro(t.bedrag)}</div>
+      </div>
+      <div class="gb-knoppen">
+        ${knoppen}
+        <button class="btn-gb afwijkend" onclick="openAfwijkend(${t.id}, ${t.bedrag})">⚡ Afwijkend</button>
+      </div>
+    </div>
+  `;
+}
+
+async function boekSnel(transId, gbId, gbNaam) {
+  try {
+    const trans = await get('/transacties?status=nieuw&limit=200');
+    const t = trans.find(x => x.id === transId);
+    if (!t) { toast('Transactie niet gevonden', 'error'); return; }
+    await post(`/transacties/${transId}/boek`, {
+      regels: [{ grootboek_id: gbId, bedrag: Math.abs(t.bedrag) }],
+      omschrijving: gbNaam
+    });
+    document.getElementById(`tc-${transId}`)?.remove();
+    toast(`Geboekt op ${gbNaam}`, 'success');
+    refreshWachtrijBadge();
+    const wachtrij = document.getElementById('boek-wachtrij');
+    if (wachtrij && !wachtrij.children.length) {
+      setContent(`<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Alles geboekt!</div></div>`);
+    }
+  } catch(e) {
+    toast('Fout: ' + e.message, 'error');
+  }
+}
+
+async function openAfwijkend(transId, bedrag) {
+  const gb = await get('/grootboeken');
+  const gbWenv = gb.filter(g => g.categorie === 'Winst en Verlies');
+
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">Afwijkende boeking — ${euro(bedrag)}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Omschrijving</label>
+        <input id="afw-omschr" type="text" placeholder="Optionele omschrijving">
+      </div>
+      <div class="split-regels" id="split-regels">
+        ${splitRegelHtml(gbWenv, 0)}
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="voegSplitRegelToe(${JSON.stringify(gbWenv).replace(/"/g,'&quot;')})">+ Regel toevoegen</button>
+      <div class="split-rest" style="margin-top:12px">
+        <span class="label">Resterend te verdelen</span>
+        <span class="waarde" id="split-rest">${euro(Math.abs(bedrag))}</span>
+      </div>
+      <div class="form-error" id="split-fout"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuleren</button>
+      <button class="btn btn-primary" onclick="boekAfwijkend(${transId}, ${Math.abs(bedrag)})">Boeken</button>
+    </div>
+  `);
+  updateSplitRest(Math.abs(bedrag));
+}
+
+let splitRegelTeller = 1;
+function splitRegelHtml(gbLijst, idx) {
+  const opties = gbLijst.map(g => `<option value="${g.id}">${escHtml(g.nummer)} — ${escHtml(g.omschrijving)}</option>`).join('');
+  return `
+    <div class="split-regel" id="sr-${idx}">
+      <select onchange="updateSplitRest(window._splitTotaal||0)">${opties}</select>
+      <input type="number" step="0.01" min="0" placeholder="0,00" class="mono"
+             oninput="updateSplitRest(window._splitTotaal||0)">
+      <button class="btn btn-danger btn-icon" onclick="document.getElementById('sr-${idx}').remove();updateSplitRest(window._splitTotaal||0)">✕</button>
+    </div>
+  `;
+}
+
+function voegSplitRegelToe(gbLijst) {
+  splitRegelTeller++;
+  const container = document.getElementById('split-regels');
+  const div = document.createElement('div');
+  div.innerHTML = splitRegelHtml(gbLijst, splitRegelTeller);
+  container.appendChild(div.firstElementChild);
+}
+
+function updateSplitRest(totaal) {
+  window._splitTotaal = totaal;
+  const bedragen = [...document.querySelectorAll('#split-regels input[type=number]')]
+    .map(i => parseFloat(i.value)||0);
+  const som = bedragen.reduce((a,b) => a+b, 0);
+  const rest = Math.round((totaal - som) * 100) / 100;
+  const el = document.getElementById('split-rest');
+  if (el) {
+    el.textContent = euro(rest);
+    el.style.color = Math.abs(rest) < 0.005 ? 'var(--teal-l)' : 'var(--amber)';
+  }
+}
+
+async function boekAfwijkend(transId, totaal) {
+  const regels = [...document.querySelectorAll('#split-regels .split-regel')].map(el => ({
+    grootboek_id: parseInt(el.querySelector('select').value),
+    bedrag: parseFloat(el.querySelector('input').value) || 0
+  })).filter(r => r.bedrag > 0);
+
+  const som = regels.reduce((a,r) => a+r.bedrag, 0);
+  if (Math.abs(som - totaal) > 0.005) {
+    document.getElementById('split-fout').textContent = `Totaal (${euro(som)}) komt niet overeen met transactiebedrag (${euro(totaal)})`;
+    return;
+  }
+  try {
+    const omschr = document.getElementById('afw-omschr').value;
+    await post(`/transacties/${transId}/boek`, { regels, omschrijving: omschr });
+    closeModal();
+    document.getElementById(`tc-${transId}`)?.remove();
+    toast('Afwijkende boeking opgeslagen', 'success');
+    refreshWachtrijBadge();
+  } catch(e) {
+    document.getElementById('split-fout').textContent = e.message;
+  }
+}
+
+// ════════════════════════════════════════════
+// ALLE TRANSACTIES
+// ════════════════════════════════════════════
+async function renderTransacties() {
+  const vandaag = new Date().toISOString().split('T')[0];
+  const eersteJan = vandaag.slice(0,4) + '-01-01';
+
+  document.getElementById('topbar-actions').innerHTML = `
+    <input type="date" id="filter-van" value="${eersteJan}" style="width:140px" onchange="laadTransacties()">
+    <span class="text-faint">t/m</span>
+    <input type="date" id="filter-tot" value="${vandaag}" style="width:140px" onchange="laadTransacties()">
+  `;
+
+  setContent(`
+    <div class="card">
+      <div class="card-body" style="padding:0">
+        <div id="trans-tabel-wrap"><div class="flex-center" style="padding:40px"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+  `);
+  laadTransacties();
+}
+
+async function laadTransacties() {
+  const van = document.getElementById('filter-van')?.value || '';
+  const tot = document.getElementById('filter-tot')?.value || '';
+  const wrap = document.getElementById('trans-tabel-wrap');
+  if (!wrap) return;
+  try {
+    const rows = await get(`/transacties/alle?van=${van}&tot=${tot}&limit=200`);
+    wrap.innerHTML = rows.length === 0
+      ? '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Geen transacties gevonden</div></div>'
+      : `<div class="table-wrap"><table>
+        <thead><tr><th>Datum</th><th>Rekening</th><th>Naam tegenpartij</th><th>Omschrijving</th><th style="text-align:right">Bedrag</th><th>Status</th></tr></thead>
+        <tbody>${rows.map(t => `
+          <tr>
+            <td class="mono">${datumNL(t.datum)}</td>
+            <td>${escHtml(t.rekening_naam || t.iban)}</td>
+            <td class="bold">${escHtml(t.naam_tegenpartij || '—')}</td>
+            <td class="text-muted">${escHtml(t.omschrijving_1 || '')}</td>
+            <td class="mono text-right ${t.bedrag < 0 ? 'neg' : 'pos'}">${euro(t.bedrag)}</td>
+            <td>${statusBadge(t.status)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+function statusBadge(s) {
+  if (s === 'geboekt') return '<span class="badge badge-teal">Geboekt</span>';
+  if (s === 'handmatig') return '<span class="badge badge-blue">Handmatig</span>';
+  return '<span class="badge badge-amber">Te boeken</span>';
+}
+
+// ════════════════════════════════════════════
+// BALANS
+// ════════════════════════════════════════════
+async function renderBalans() {
+  const vandaag = new Date().toISOString().split('T')[0];
+  document.getElementById('topbar-actions').innerHTML = `
+    <input type="date" id="balans-datum" value="${vandaag}" onchange="laadBalans()">
+    <button class="btn btn-secondary btn-sm" onclick="exportBalans()">↓ PDF</button>
+  `;
+  setContent('<div id="balans-content"><div class="flex-center" style="padding:60px"><div class="spinner"></div></div></div>');
+  laadBalans();
+}
+
+async function laadBalans() {
+  const datum = document.getElementById('balans-datum')?.value || new Date().toISOString().split('T')[0];
+  const wrap = document.getElementById('balans-content');
+  try {
+    const b = await get(`/rapportages/balans?datum=${datum}`);
+    const groepHtml = (groepen) => Object.entries(groepen).map(([naam, items]) => `
+      <div class="balans-groep">
+        <div class="balans-groep-naam">${escHtml(naam)}</div>
+        ${items.map(i => `
+          <div class="balans-regel">
+            <span class="naam">${escHtml(i.nummer)} ${escHtml(i.omschrijving)}</span>
+            <span class="bedrag">${euro(i.saldo)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+
+    wrap.innerHTML = `
+      <div class="card mb-16">
+        <div class="card-body" style="display:flex;justify-content:space-between;align-items:center">
+          <span class="text-sm text-muted">Balans per <strong>${datumNL(datum)}</strong></span>
+          ${b.in_balans
+            ? '<span class="badge badge-teal">✓ In balans</span>'
+            : '<span class="badge badge-red">⚠ Niet in balans</span>'}
+        </div>
+      </div>
+      <div class="balans-grid">
+        <div>
+          <div class="card-title mb-16" style="color:var(--blue-l)">ACTIVA</div>
+          ${groepHtml(b.activa)}
+          <div class="balans-totaal">
+            <span>Totaal activa</span>
+            <span class="bedrag">${euro(b.totaal_activa)}</span>
+          </div>
+        </div>
+        <div>
+          <div class="card-title mb-16" style="color:var(--teal-l)">PASSIVA</div>
+          ${groepHtml(b.passiva)}
+          <div class="balans-totaal">
+            <span>Totaal passiva</span>
+            <span class="bedrag">${euro(b.totaal_passiva)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+function exportBalans() { window.print(); }
+
+// ════════════════════════════════════════════
+// W&V REKENING
+// ════════════════════════════════════════════
+async function renderWenv() {
+  const jaar = new Date().getFullYear();
+  document.getElementById('topbar-actions').innerHTML = `
+    <select id="wenv-jaar" onchange="laadWenv()">
+      ${[jaar-1, jaar, jaar+1].map(j => `<option ${j===jaar?'selected':''}>${j}</option>`).join('')}
+    </select>
+  `;
+  setContent('<div id="wenv-content"><div class="flex-center" style="padding:60px"><div class="spinner"></div></div></div>');
+  laadWenv();
+}
+
+async function laadWenv() {
+  const jaar = parseInt(document.getElementById('wenv-jaar')?.value || new Date().getFullYear());
+  const wrap = document.getElementById('wenv-content');
+  try {
+    const wv = await get(`/rapportages/wenv?jaar=${jaar}`);
+    let html = `<div class="table-wrap"><table class="rapport-table">
+      <thead><tr><th>Omschrijving</th><th>Gerealiseerd</th><th>Budget</th><th>Afwijking</th></tr></thead>
+      <tbody>`;
+
+    for (const [groep, items] of Object.entries(wv.groepen)) {
+      html += `<tr class="groep-header"><td colspan="4">${escHtml(groep)}</td></tr>`;
+      items.forEach(i => {
+        const afw = i.gerealiseerd - i.budget;
+        html += `<tr>
+          <td style="padding-left:20px">${escHtml(i.nummer)} ${escHtml(i.omschrijving)}</td>
+          <td class="${euroClass(i.gerealiseerd)}">${euro(i.gerealiseerd)}</td>
+          <td>${euro(i.budget)}</td>
+          <td class="${euroClass(afw)}">${euro(afw)}</td>
+        </tr>`;
+      });
+      const tot = items.reduce((s,i) => s+i.gerealiseerd, 0);
+      html += `<tr class="subtotaal"><td>Subtotaal ${escHtml(groep)}</td><td class="${euroClass(tot)}">${euro(tot)}</td><td></td><td></td></tr>`;
+    }
+
+    html += `<tr class="totaal">
+      <td>Netto resultaat ${jaar}</td>
+      <td class="${euroClass(wv.netto)}">${euro(wv.netto)}</td>
+      <td></td><td></td>
+    </tr></tbody></table></div>`;
+
+    wrap.innerHTML = html;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+// ════════════════════════════════════════════
+// MAANDOVERZICHT
+// ════════════════════════════════════════════
+const MAANDEN = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+
+async function renderMaand() {
+  const jaar = new Date().getFullYear();
+  document.getElementById('topbar-actions').innerHTML = `
+    <select id="maand-jaar" onchange="laadMaand()">
+      ${[jaar-1, jaar, jaar+1].map(j => `<option ${j===jaar?'selected':''}>${j}</option>`).join('')}
+    </select>
+  `;
+  setContent(`
+    <div class="modus-knoppen">
+      <button class="modus-btn active" onclick="setModus('budget',this)">Budget</button>
+      <button class="modus-btn" onclick="setModus('gerealiseerd',this)">Gerealiseerd</button>
+      <button class="modus-btn" onclick="setModus('perc',this)">+ % afwijking</button>
+      <button class="modus-btn" onclick="setModus('abs',this)">+ Abs. afwijking</button>
+      <button class="modus-btn" onclick="setModus('jaar',this)">Jaaroverzicht</button>
+    </div>
+    <div id="maand-content"><div class="flex-center" style="padding:60px"><div class="spinner"></div></div></div>
+  `);
+  window._maandModus = 'budget';
+  laadMaand();
+}
+
+function setModus(modus, btn) {
+  window._maandModus = modus;
+  document.querySelectorAll('.modus-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  laadMaand();
+}
+
+async function laadMaand() {
+  const jaar = parseInt(document.getElementById('maand-jaar')?.value || new Date().getFullYear());
+  const modus = window._maandModus || 'budget';
+  const wrap = document.getElementById('maand-content');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="flex-center" style="padding:40px"><div class="spinner"></div></div>';
+
+  try {
+    const data = await get(`/rapportages/maand?jaar=${jaar}`);
+    const isJaar = modus === 'jaar';
+
+    // Kolommen
+    const kolommen = isJaar ? MAANDEN.map((m,i) => i+1) : null;
+    const headers = isJaar
+      ? MAANDEN.map(m => `<th>${m}</th>`).join('') + '<th>Totaal</th>'
+      : '<th>Gerealiseerd</th><th>Budget</th>' + (modus === 'perc' ? '<th>% afwijk.</th>' : modus === 'abs' ? '<th>Abs. afwijk.</th>' : '');
+
+    let html = `<div class="table-wrap"><table class="rapport-table budget-tabel">
+      <thead><tr><th>Omschrijving</th>${headers}</tr></thead><tbody>`;
+
+    for (const [groep, items] of Object.entries(data.groepen)) {
+      html += `<tr class="groep-header"><td colspan="${isJaar ? 15 : 4}">${escHtml(groep)}</td></tr>`;
+      items.forEach(item => {
+        html += `<tr><td style="padding-left:20px">${escHtml(item.nummer)} ${escHtml(item.omschrijving)}</td>`;
+        if (isJaar) {
+          let jaarTot = 0;
+          for (let m = 1; m <= 12; m++) {
+            const val = item.maanden[m]?.gerealiseerd || 0;
+            jaarTot += val;
+            html += `<td class="${euroClass(val)}">${val !== 0 ? euro(val) : '—'}</td>`;
+          }
+          html += `<td class="${euroClass(jaarTot)}" style="font-weight:600">${euro(jaarTot)}</td>`;
+        } else {
+          const g = item.totaal_gerealiseerd, b = item.totaal_budget;
+          const afw = g - b;
+          const perc = b !== 0 ? ((g / b) * 100 - 100).toFixed(1) : '—';
+          if (modus === 'budget') {
+            html += `<td class="${euroClass(b)}">${euro(b)}</td><td></td>`;
+          } else if (modus === 'gerealiseerd') {
+            html += `<td class="${euroClass(g)}">${euro(g)}</td><td></td>`;
+          } else if (modus === 'perc') {
+            html += `<td class="${euroClass(g)}">${euro(g)}</td><td>${euro(b)}</td><td class="${euroClass(afw)}">${typeof perc === 'number' ? (perc > 0 ? '+' : '') + perc + '%' : perc}</td>`;
+          } else if (modus === 'abs') {
+            html += `<td class="${euroClass(g)}">${euro(g)}</td><td>${euro(b)}</td><td class="${euroClass(afw)}">${euro(afw)}</td>`;
+          }
+        }
+        html += `</tr>`;
+      });
+    }
+
+    html += `</tbody></table></div>`;
+    wrap.innerHTML = html;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+// ════════════════════════════════════════════
+// GROOTBOEKEN
+// ════════════════════════════════════════════
+const GROEPEN_BALANS = ['Vaste activa','Liquide middelen','Eigen vermogen','Schulden'];
+const GROEPEN_WENV = ['Inkomsten','Maandelijkse vaste lasten','Niet-maandelijkse vaste lasten','Variabele lasten','Sparen / reserveringen'];
+const SUBGROEPEN = ['Abonnementen','Boodschappen','Kinderopvang','Leningen','Nutsvoorzieningen','Verzekeringen'];
+
+async function renderGrootboeken() {
+  if (isBeheerder()) {
+    document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="openGrootboekModal()">+ Nieuw grootboek</button>`;
+  }
+  setContent('<div id="gb-lijst"><div class="flex-center" style="padding:60px"><div class="spinner"></div></div></div>');
+  laadGrootboeken();
+}
+
+async function laadGrootboeken() {
+  const wrap = document.getElementById('gb-lijst');
+  try {
+    const gb = await get('/grootboeken');
+    if (gb.length === 0) {
+      wrap.innerHTML = '<div class="empty"><div class="empty-icon">📒</div><div class="empty-text">Nog geen grootboekrekeningen aangemaakt</div></div>';
+      return;
+    }
+    // Groepeer per categorie
+    const balans = gb.filter(g => g.categorie === 'Balans');
+    const wenv = gb.filter(g => g.categorie === 'Winst en Verlies');
+
+    const tabelHtml = (items) => `<div class="table-wrap"><table>
+      <thead><tr><th>Nummer</th><th>Omschrijving</th><th>Groep</th><th>Subgroep</th><th>Type</th>${isBeheerder() ? '<th>Acties</th>' : ''}</tr></thead>
+      <tbody>${items.map(g => `<tr>
+        <td class="mono bold">${escHtml(g.nummer)}</td>
+        <td class="bold">${escHtml(g.omschrijving)}</td>
+        <td>${escHtml(g.groep)}</td>
+        <td class="text-muted">${escHtml(g.subgroep || '—')}</td>
+        <td>${g.is_bankrekening ? '<span class="badge badge-blue">Bank</span>' : '<span class="badge badge-gray">Normaal</span>'}</td>
+        ${isBeheerder() ? `<td class="actions">
+          <button class="btn btn-secondary btn-xs" onclick="openGrootboekModal(${JSON.stringify(g).replace(/"/g,'&quot;')})">Bewerken</button>
+          <button class="btn btn-danger btn-xs" onclick="verwijderGrootboek(${g.id}, '${escHtml(g.omschrijving)}')">Verwijderen</button>
+        </td>` : ''}
+      </tr>`).join('')}
+      </tbody></table></div>`;
+
+    wrap.innerHTML = `
+      <div class="tabs" id="gb-tabs">
+        <button class="tab active" onclick="switchGbTab(0,this)">Balans (${balans.length})</button>
+        <button class="tab" onclick="switchGbTab(1,this)">Winst en Verlies (${wenv.length})</button>
+      </div>
+      <div id="gb-tab-0" class="card">${tabelHtml(balans)}</div>
+      <div id="gb-tab-1" class="card hidden">${tabelHtml(wenv)}</div>
+    `;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+function switchGbTab(idx, btn) {
+  document.querySelectorAll('#gb-tabs .tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  [0,1].forEach(i => document.getElementById(`gb-tab-${i}`)?.classList.toggle('hidden', i !== idx));
+}
+
+function openGrootboekModal(gb = null) {
+  const isNieuw = !gb;
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">${isNieuw ? 'Nieuw grootboek' : 'Grootboek bewerken'}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nummer (4 cijfers)</label>
+          <input id="gb-nummer" class="mono" maxlength="4" value="${escHtml(gb?.nummer||'')}" ${!isNieuw ? 'readonly' : ''} placeholder="1100">
+        </div>
+        <div class="form-group">
+          <label>Categorie</label>
+          <select id="gb-categorie" onchange="updateGbGroepen()">
+            <option ${gb?.categorie==='Balans'?'selected':''}>Balans</option>
+            <option ${gb?.categorie==='Winst en Verlies'?'selected':''}>Winst en Verlies</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Omschrijving</label>
+        <input id="gb-omschr" value="${escHtml(gb?.omschrijving||'')}" placeholder="Bijv. Boodschappen">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Groep</label>
+          <select id="gb-groep"></select>
+        </div>
+        <div class="form-group">
+          <label>Subgroep</label>
+          <select id="gb-subgroep">
+            <option value="">— Geen —</option>
+            ${SUBGROEPEN.map(s => `<option ${gb?.subgroep===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="gb-isbank" ${gb?.is_bankrekening?'checked':''} onchange="toggleBankVelden()"> Dit is een bankrekening</label>
+      </div>
+      <div id="bank-velden" class="${gb?.is_bankrekening ? '' : 'hidden'}">
+        <div class="form-row">
+          <div class="form-group">
+            <label>IBAN</label>
+            <input id="gb-iban" class="mono" value="${escHtml(gb?.iban||'')}" placeholder="NL00RABO0000000000">
+          </div>
+          <div class="form-group">
+            <label>Naam rekening</label>
+            <input id="gb-reknaam" value="${escHtml(gb?.rekening_naam||'')}" placeholder="Betaalrekening gezin">
+          </div>
+        </div>
+      </div>
+      <div class="form-error" id="gb-fout"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuleren</button>
+      <button class="btn btn-primary" onclick="slaGrootboekOp(${gb?.id||'null'})">${isNieuw ? 'Aanmaken' : 'Opslaan'}</button>
+    </div>
+  `);
+  updateGbGroepen(gb?.groep);
+}
+
+function updateGbGroepen(huidig = null) {
+  const cat = document.getElementById('gb-categorie')?.value;
+  const groepen = cat === 'Balans' ? GROEPEN_BALANS : GROEPEN_WENV;
+  const sel = document.getElementById('gb-groep');
+  if (!sel) return;
+  sel.innerHTML = groepen.map(g => `<option ${g === huidig ? 'selected' : ''}>${g}</option>`).join('');
+}
+
+function toggleBankVelden() {
+  const checked = document.getElementById('gb-isbank')?.checked;
+  document.getElementById('bank-velden')?.classList.toggle('hidden', !checked);
+}
+
+async function slaGrootboekOp(gbId) {
+  const isNieuw = !gbId;
+  const data = {
+    nummer: document.getElementById('gb-nummer').value.trim(),
+    omschrijving: document.getElementById('gb-omschr').value.trim(),
+    categorie: document.getElementById('gb-categorie').value,
+    groep: document.getElementById('gb-groep').value,
+    subgroep: document.getElementById('gb-subgroep').value || null,
+    is_bankrekening: document.getElementById('gb-isbank').checked ? 1 : 0,
+    iban: document.getElementById('gb-iban')?.value.trim() || null,
+    rekening_naam: document.getElementById('gb-reknaam')?.value.trim() || null,
+  };
+  if (!data.nummer.match(/^\d{4}$/)) {
+    document.getElementById('gb-fout').textContent = 'Nummer moet precies 4 cijfers zijn';
+    return;
+  }
+  try {
+    if (isNieuw) await post('/grootboeken', data);
+    else await put(`/grootboeken/${gbId}`, data);
+    closeModal(); toast(isNieuw ? 'Grootboek aangemaakt' : 'Bijgewerkt', 'success');
+    laadGrootboeken();
+  } catch(e) {
+    document.getElementById('gb-fout').textContent = e.message;
+  }
+}
+
+async function verwijderGrootboek(gbId, naam) {
+  if (!confirm(`Grootboek "${naam}" verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
+  try {
+    await del(`/grootboeken/${gbId}`);
+    toast('Verwijderd', 'success'); laadGrootboeken();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════
+// BANKREKENINGEN
+// ════════════════════════════════════════════
+async function renderBankrekeningen() {
+  if (isBeheerder()) {
+    document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="openBankrekeningModal()">+ Nieuwe rekening</button>`;
+  }
+  setContent('<div id="br-lijst"></div>');
+  laadBankrekeningen();
+}
+
+async function laadBankrekeningen() {
+  const wrap = document.getElementById('br-lijst');
+  try {
+    const rows = await get('/bankrekeningen');
+    wrap.innerHTML = rows.length === 0
+      ? '<div class="empty"><div class="empty-icon">🏦</div><div class="empty-text">Geen bankrekeningen geconfigureerd</div></div>'
+      : `<div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>Naam</th><th>IBAN</th><th>Gekoppeld grootboek</th>${isBeheerder()?'<th>Acties</th>':''}</tr></thead>
+          <tbody>${rows.map(r => `<tr>
+            <td class="bold">${escHtml(r.naam)}</td>
+            <td class="mono">${escHtml(r.iban)}</td>
+            <td>${escHtml(r.gb_nummer ? r.gb_nummer + ' — ' + r.gb_omschrijving : '— Niet gekoppeld —')}</td>
+            ${isBeheerder() ? `<td><button class="btn btn-secondary btn-xs" onclick="openBankrekeningModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">Bewerken</button></td>` : ''}
+          </tr>`).join('')}
+          </tbody></table></div></div>`;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+async function openBankrekeningModal(br = null) {
+  const gb = await get('/grootboeken');
+  const gbBalans = gb.filter(g => g.categorie === 'Balans');
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">${br ? 'Bankrekening bewerken' : 'Nieuwe bankrekening'}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Naam</label><input id="br-naam" value="${escHtml(br?.naam||'')}" placeholder="Betaalrekening gezin"></div>
+      <div class="form-group"><label>IBAN</label><input id="br-iban" class="mono" value="${escHtml(br?.iban||'')}" placeholder="NL00RABO0000000000"></div>
+      <div class="form-group">
+        <label>Gekoppeld grootboek (balansrekening)</label>
+        <select id="br-gb">
+          <option value="">— Selecteer —</option>
+          ${gbBalans.map(g => `<option value="${g.id}" ${br?.grootboek_id===g.id?'selected':''}>${g.nummer} — ${escHtml(g.omschrijving)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-error" id="br-fout"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuleren</button>
+      <button class="btn btn-primary" onclick="slaBankrekeningOp(${br?.id||'null'})">${br ? 'Opslaan' : 'Aanmaken'}</button>
+    </div>
+  `);
+}
+
+async function slaBankrekeningOp(brId) {
+  const data = {
+    naam: document.getElementById('br-naam').value.trim(),
+    iban: document.getElementById('br-iban').value.trim(),
+    grootboek_id: parseInt(document.getElementById('br-gb').value) || null
+  };
+  try {
+    if (brId) await put(`/bankrekeningen/${brId}`, data);
+    else await post('/bankrekeningen', data);
+    closeModal(); toast('Opgeslagen', 'success'); laadBankrekeningen();
+  } catch(e) { document.getElementById('br-fout').textContent = e.message; }
+}
+
+// ════════════════════════════════════════════
+// MATCHREGELS
+// ════════════════════════════════════════════
+async function renderMatchregels() {
+  if (isBeheerder()) {
+    document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="openMatchregelModal()">+ Nieuwe matchregel</button>`;
+  }
+  setContent('<div id="mr-lijst"></div>');
+  laadMatchregels();
+}
+
+async function laadMatchregels() {
+  const wrap = document.getElementById('mr-lijst');
+  try {
+    const rows = await get('/matchregels');
+    wrap.innerHTML = rows.length === 0
+      ? '<div class="empty"><div class="empty-icon">⚡</div><div class="empty-text">Geen matchregels aangemaakt</div></div>'
+      : `<div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>Naam</th><th>Conditie</th><th>Doelgrootboek</th>${isBeheerder()?'<th>Acties</th>':''}</tr></thead>
+          <tbody>${rows.map(r => `<tr>
+            <td class="bold">${escHtml(r.naam)}</td>
+            <td><code style="font-family:var(--mono);font-size:0.75rem;color:var(--blue-l);background:rgba(37,99,235,0.08);padding:2px 6px;border-radius:4px">${escHtml(r.conditie)}</code></td>
+            <td>${escHtml(r.gb_nummer)} — ${escHtml(r.gb_omschrijving)}</td>
+            ${isBeheerder() ? `<td class="actions">
+              <button class="btn btn-secondary btn-xs" onclick="openMatchregelModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">Bewerken</button>
+              <button class="btn btn-danger btn-xs" onclick="verwijderMatchregel(${r.id}, '${escHtml(r.naam)}')">Verwijderen</button>
+            </td>` : ''}
+          </tr>`).join('')}
+          </tbody></table></div></div>`;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+async function openMatchregelModal(mr = null) {
+  const gb = await get('/grootboeken');
+  const gbWenv = gb.filter(g => g.categorie === 'Winst en Verlies');
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">${mr ? 'Matchregel bewerken' : 'Nieuwe matchregel'}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Naam</label><input id="mr-naam" value="${escHtml(mr?.naam||'')}" placeholder="Bijv. Albert Heijn boodschappen"></div>
+      <div class="form-group">
+        <label>Conditie</label>
+        <input id="mr-conditie" class="mono" value="${escHtml(mr?.conditie||'')}" placeholder="NAAM LIKE 'albert heijn'">
+        <div class="help-text">Syntaxis: <code>BEDRAG &lt; -50 AND NAAM LIKE 'jumbo'</code> — Velden: BEDRAG, NAAM, OMSCHRIJVING — Operatoren: =, &lt;, &gt;, &lt;=, &gt;=, LIKE</div>
+      </div>
+      <div class="form-group">
+        <label>Doelgrootboek</label>
+        <select id="mr-gb">
+          <option value="">— Selecteer grootboek —</option>
+          ${gbWenv.map(g => `<option value="${g.id}" ${mr?.grootboek_id===g.id?'selected':''}>${g.nummer} — ${escHtml(g.omschrijving)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <button class="btn btn-secondary btn-sm" onclick="testConditie()">▶ Conditie testen</button>
+        <span id="conditie-test-result" style="margin-left:10px;font-size:0.78rem"></span>
+      </div>
+      <div class="form-error" id="mr-fout"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuleren</button>
+      <button class="btn btn-primary" onclick="slaMatchregelOp(${mr?.id||'null'})">${mr ? 'Opslaan' : 'Aanmaken'}</button>
+    </div>
+  `);
+}
+
+async function testConditie() {
+  const conditie = document.getElementById('mr-conditie')?.value;
+  const res = document.getElementById('conditie-test-result');
+  try {
+    const r = await post('/matchregels/test', { conditie });
+    res.innerHTML = r.geldig
+      ? '<span style="color:var(--teal-l)">✓ Geldige syntax</span>'
+      : `<span style="color:var(--red)">✕ ${escHtml(r.fout)}</span>`;
+  } catch(e) { res.innerHTML = `<span style="color:var(--red)">✕ ${escHtml(e.message)}</span>`; }
+}
+
+async function slaMatchregelOp(mrId) {
+  const data = {
+    naam: document.getElementById('mr-naam').value.trim(),
+    conditie: document.getElementById('mr-conditie').value.trim(),
+    grootboek_id: parseInt(document.getElementById('mr-gb').value)
+  };
+  if (!data.naam || !data.conditie || !data.grootboek_id) {
+    document.getElementById('mr-fout').textContent = 'Vul alle velden in';
+    return;
+  }
+  try {
+    if (mrId) await put(`/matchregels/${mrId}`, data);
+    else await post('/matchregels', data);
+    closeModal(); toast('Matchregel opgeslagen', 'success'); laadMatchregels();
+  } catch(e) { document.getElementById('mr-fout').textContent = e.message; }
+}
+
+async function verwijderMatchregel(id, naam) {
+  if (!confirm(`Matchregel "${naam}" verwijderen?`)) return;
+  try { await del(`/matchregels/${id}`); toast('Verwijderd', 'success'); laadMatchregels(); }
+  catch(e) { toast(e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════
+// BUDGETTEN
+// ════════════════════════════════════════════
+async function renderBudgetten() {
+  const jaar = new Date().getFullYear();
+  document.getElementById('topbar-actions').innerHTML = `
+    <select id="budget-jaar" onchange="laadBudgetten()">
+      ${[jaar-1, jaar, jaar+1].map(j => `<option ${j===jaar?'selected':''}>${j}</option>`).join('')}
+    </select>
+    ${isBeheerder() ? '<button class="btn btn-primary btn-sm" onclick="slaAlleBudgettenOp()">Opslaan</button>' : ''}
+  `;
+  setContent('<div id="budget-content"><div class="flex-center" style="padding:60px"><div class="spinner"></div></div></div>');
+  laadBudgetten();
+}
+
+async function laadBudgetten() {
+  const jaar = parseInt(document.getElementById('budget-jaar')?.value || new Date().getFullYear());
+  const wrap = document.getElementById('budget-content');
+  if (!wrap) return;
+  try {
+    const [gb, budgetten] = await Promise.all([
+      get('/grootboeken'),
+      get(`/budgetten?jaar=${jaar}`)
+    ]);
+    const gbWenv = gb.filter(g => g.categorie === 'Winst en Verlies');
+
+    // Index budgetten op gb_id+maand
+    const budIdx = {};
+    budgetten.forEach(b => { budIdx[`${b.grootboek_id}_${b.maand}`] = b.bedrag; });
+
+    let html = `<div class="budget-grid"><table class="rapport-table budget-tabel">
+      <thead><tr><th>Grootboek</th>${MAANDEN.map(m=>`<th>${m}</th>`).join('')}<th>Totaal</th></tr></thead>
+      <tbody>`;
+
+    const GROEP_VOLGORDE = ['Inkomsten','Maandelijkse vaste lasten','Niet-maandelijkse vaste lasten','Variabele lasten','Sparen / reserveringen'];
+    const gbPerGroep = {};
+    gbWenv.forEach(g => { (gbPerGroep[g.groep] = gbPerGroep[g.groep]||[]).push(g); });
+
+    for (const groep of GROEP_VOLGORDE) {
+      const items = gbPerGroep[groep] || [];
+      if (!items.length) continue;
+      html += `<tr class="groep-header"><td colspan="14">${escHtml(groep)}</td></tr>`;
+      items.forEach(g => {
+        let jaarTot = 0;
+        html += `<tr><td style="padding-left:20px">${escHtml(g.nummer)} ${escHtml(g.omschrijving)}</td>`;
+        for (let m = 1; m <= 12; m++) {
+          const val = budIdx[`${g.id}_${m}`] || 0;
+          jaarTot += val;
+          html += `<td>${isBeheerder()
+            ? `<input type="number" step="0.01" data-gb="${g.id}" data-maand="${m}" value="${val||''}" placeholder="0">`
+            : `<span class="${euroClass(val)}">${val ? euro(val) : '—'}</span>`}</td>`;
+        }
+        html += `<td style="font-weight:600">${euro(jaarTot)}</td></tr>`;
+      });
+    }
+
+    html += `</tbody></table></div>`;
+    wrap.innerHTML = html;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+async function slaAlleBudgettenOp() {
+  const jaar = parseInt(document.getElementById('budget-jaar')?.value);
+  const inputs = document.querySelectorAll('.budget-tabel input[data-gb]');
+  const posten = [...inputs].map(inp => ({
+    grootboek_id: parseInt(inp.dataset.gb),
+    jaar,
+    maand: parseInt(inp.dataset.maand),
+    bedrag: parseFloat(inp.value) || 0
+  })).filter(p => p.bedrag >= 0);
+
+  try {
+    await post('/budgetten', { posten });
+    toast('Budgetten opgeslagen', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════
+// OPENINGSBALANS
+// ════════════════════════════════════════════
+async function renderOpeningsbalans() {
+  const gb = await get('/grootboeken');
+  const gbBalans = gb.filter(g => g.categorie === 'Balans');
+
+  setContent(`
+    <div class="card" style="max-width:700px">
+      <div class="card-header">
+        <span class="card-title">Openingsbalans invoeren</span>
+      </div>
+      <div class="card-body">
+        <div class="form-row" style="margin-bottom:16px">
+          <div class="form-group">
+            <label>Datum openingsbalans</label>
+            <input type="date" id="ob-datum" value="2025-07-01">
+          </div>
+        </div>
+        <div class="help-text mb-16" style="margin-bottom:16px">
+          Voer het beginsaldo in voor elke balansrekening. Positief = debet (activa), negatief = credit (passiva/schulden).
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+          <thead><tr><th style="text-align:left;padding:8px;color:var(--text2);font-size:0.75rem">Grootboek</th><th style="text-align:right;padding:8px;color:var(--text2);font-size:0.75rem">Saldo</th></tr></thead>
+          <tbody>
+            ${gbBalans.map(g => `
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px"><span class="mono text-sm">${escHtml(g.nummer)}</span> ${escHtml(g.omschrijving)}</td>
+                <td style="padding:8px;text-align:right">
+                  <input type="number" step="0.01" class="mono ob-post" data-gb="${g.id}"
+                         style="width:130px;text-align:right" placeholder="0,00">
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="form-error" id="ob-fout"></div>
+        <button class="btn btn-primary" onclick="slaOpeningsbalansOp()">Openingsbalans boeken</button>
+      </div>
+    </div>
+  `);
+}
+
+async function slaOpeningsbalansOp() {
+  const datum = document.getElementById('ob-datum').value;
+  const inputs = document.querySelectorAll('.ob-post');
+  const posten = [...inputs].map(i => ({
+    grootboek_id: parseInt(i.dataset.gb),
+    saldo: parseFloat(i.value) || 0
+  })).filter(p => p.saldo !== 0);
+
+  if (!posten.length) { document.getElementById('ob-fout').textContent = 'Voer minimaal één saldo in'; return; }
+
+  try {
+    await post('/openingsbalans', { datum, posten });
+    toast('Openingsbalans geboekt', 'success');
+  } catch(e) { document.getElementById('ob-fout').textContent = e.message; }
+}
+
+// ════════════════════════════════════════════
+// GEBRUIKERSBEHEER
+// ════════════════════════════════════════════
+async function renderGebruikers() {
+  document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="openGebruikerModal()">+ Nieuwe gebruiker</button>`;
+  setContent('<div id="gb-gebruikers"></div>');
+  laadGebruikers();
+}
+
+async function laadGebruikers() {
+  const wrap = document.getElementById('gb-gebruikers');
+  try {
+    const rows = await get('/gebruikers');
+    wrap.innerHTML = `<div class="card"><div class="table-wrap"><table>
+      <thead><tr><th>Gebruikersnaam</th><th>Rol</th><th>Status</th><th>Aangemaakt</th><th>Acties</th></tr></thead>
+      <tbody>${rows.map(r => `<tr>
+        <td class="bold">${escHtml(r.gebruikersnaam)}</td>
+        <td>${r.rol === 'beheerder' ? '<span class="badge badge-blue">Beheerder</span>' : '<span class="badge badge-gray">Gebruiker</span>'}</td>
+        <td>${r.actief ? '<span class="badge badge-teal">Actief</span>' : '<span class="badge badge-red">Inactief</span>'}</td>
+        <td class="mono text-sm">${datumNL(r.aangemaakt?.split('T')[0])}</td>
+        <td class="actions">
+          <button class="btn btn-secondary btn-xs" onclick="openGebruikerModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">Bewerken</button>
+          ${r.id !== S.gebruiker.id ? `<button class="btn btn-danger btn-xs" onclick="deactiveerGebruiker(${r.id}, '${escHtml(r.gebruikersnaam)}')">Deactiveren</button>` : ''}
+        </td>
+      </tr>`).join('')}
+      </tbody></table></div></div>`;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+function openGebruikerModal(g = null) {
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">${g ? 'Gebruiker bewerken' : 'Nieuwe gebruiker'}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Gebruikersnaam</label><input id="gu-naam" value="${escHtml(g?.gebruikersnaam||'')}" ${g?'readonly':''}></div>
+      <div class="form-group">
+        <label>Rol</label>
+        <select id="gu-rol">
+          <option value="gebruiker" ${g?.rol==='gebruiker'?'selected':''}>Gebruiker</option>
+          <option value="beheerder" ${g?.rol==='beheerder'?'selected':''}>Beheerder</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>${g ? 'Nieuw wachtwoord (leeg = niet wijzigen)' : 'Wachtwoord'}</label>
+        <input id="gu-ww" type="password" placeholder="${g ? '(ongewijzigd)' : 'Wachtwoord instellen'}">
+      </div>
+      <div class="form-error" id="gu-fout"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuleren</button>
+      <button class="btn btn-primary" onclick="slaGebruikerOp(${g?.id||'null'})">${g ? 'Opslaan' : 'Aanmaken'}</button>
+    </div>
+  `);
+}
+
+async function slaGebruikerOp(gId) {
+  const isNieuw = !gId;
+  const data = {
+    gebruikersnaam: document.getElementById('gu-naam').value.trim(),
+    rol: document.getElementById('gu-rol').value,
+    wachtwoord: document.getElementById('gu-ww').value || undefined
+  };
+  if (isNieuw && !data.wachtwoord) { document.getElementById('gu-fout').textContent = 'Wachtwoord is verplicht'; return; }
+  try {
+    if (isNieuw) await post('/gebruikers', data);
+    else await put(`/gebruikers/${gId}`, data);
+    closeModal(); toast('Opgeslagen', 'success'); laadGebruikers();
+  } catch(e) { document.getElementById('gu-fout').textContent = e.message; }
+}
+
+async function deactiveerGebruiker(id, naam) {
+  if (!confirm(`Gebruiker "${naam}" deactiveren?`)) return;
+  try { await put(`/gebruikers/${id}`, { actief: 0 }); toast('Gedeactiveerd', 'success'); laadGebruikers(); }
+  catch(e) { toast(e.message, 'error'); }
+}
+</script>
+</body>
+</html>
