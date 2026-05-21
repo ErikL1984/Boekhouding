@@ -251,6 +251,41 @@ def api_transacties_alle():
     rows = database.query(sql, params)
     return json_response([dict(r) for r in rows])
 
+@app.route('/api/transacties/hermatchen', methods=['POST'])
+@auth_required
+def api_hermatchen():
+    from importeer import haal_matchregels, haal_bank_grootboek, boek_automatisch, haal_eigen_ibans, boek_intern
+    from matchengine import zoek_match
+
+    matchregels = haal_matchregels()
+    eigen_ibans = haal_eigen_ibans()
+
+    transacties = database.query("SELECT * FROM banktransacties WHERE status = 'nieuw'")
+    auto_geboekt = 0
+
+    for trans in transacties:
+        trans = dict(trans)
+        iban = trans['iban']
+        tegenrekening = (trans.get('tegenrekening_iban') or '').replace(' ', '').upper()
+
+        if tegenrekening and tegenrekening in eigen_ibans:
+            gb_van = haal_bank_grootboek(iban)
+            gb_naar = haal_bank_grootboek(tegenrekening)
+            if gb_van and gb_naar:
+                boek_intern(trans['id'], trans['datum'], trans['bedrag'], gb_van, gb_naar, g.gebruiker['id'])
+                auto_geboekt += 1
+                continue
+
+        match = zoek_match(trans, matchregels)
+        if match:
+            gb_bank = haal_bank_grootboek(iban)
+            if gb_bank:
+                boek_automatisch(trans['id'], trans['datum'], trans['bedrag'], gb_bank,
+                                 match['grootboek_id'], match['gb_omschrijving'], g.gebruiker['id'])
+                auto_geboekt += 1
+
+    return json_response({'auto_geboekt': auto_geboekt})
+
 @app.route('/api/transacties/<int:tid>/boek', methods=['POST'])
 @auth_required
 def api_boek_transactie(tid):
