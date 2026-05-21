@@ -189,11 +189,10 @@ def api_grootboek_aanmaken():
     if bestaand:
         return json_response({'error': 'Nummer bestaat al'}, 400)
     gid = database.execute(
-        """INSERT INTO grootboeken (nummer, omschrijving, categorie, groep, subgroep, is_bankrekening, iban, rekening_naam)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO grootboeken (nummer, omschrijving, categorie, groep, is_bankrekening, iban, rekening_naam)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
         (data.get('nummer'), data.get('omschrijving'), data.get('categorie'),
-         data.get('groep'), data.get('subgroep') or None,
-         data.get('is_bankrekening', 0),
+         data.get('groep'), data.get('is_bankrekening', 0),
          data.get('iban'), data.get('rekening_naam'))
     )
     return json_response({'id': gid, 'bericht': 'Grootboek aangemaakt'}, 201)
@@ -203,10 +202,9 @@ def api_grootboek_aanmaken():
 def api_grootboek_update(gid):
     data = request.json or {}
     database.execute(
-        """UPDATE grootboeken SET omschrijving=?, categorie=?, groep=?, subgroep=?,
+        """UPDATE grootboeken SET omschrijving=?, categorie=?, groep=?,
            is_bankrekening=?, iban=?, rekening_naam=? WHERE id=?""",
         (data.get('omschrijving'), data.get('categorie'), data.get('groep'),
-         data.get('subgroep') or None,
          data.get('is_bankrekening', 0),
          data.get('iban'), data.get('rekening_naam'), gid)
     )
