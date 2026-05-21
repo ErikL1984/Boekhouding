@@ -1237,12 +1237,19 @@ async function laadWenv() {
 // MAANDOVERZICHT
 // ════════════════════════════════════════════
 const MAANDEN = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+const MAANDEN_LANG = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
 
 async function renderMaand() {
-  const jaar = new Date().getFullYear();
+  const nu = new Date();
+  const jaar = nu.getFullYear();
+  const huidigeMaand = nu.getMonth() + 1;
   document.getElementById('topbar-actions').innerHTML = `
     <select id="maand-jaar" onchange="laadMaand()">
       ${[jaar-1, jaar, jaar+1].map(j => `<option ${j===jaar?'selected':''}>${j}</option>`).join('')}
+    </select>
+    <select id="maand-maand" onchange="laadMaand()">
+      <option value="0">Alle maanden</option>
+      ${MAANDEN_LANG.map((m, i) => `<option value="${i+1}" ${i+1===huidigeMaand?'selected':''}>${m}</option>`).join('')}
     </select>
   `;
   setContent(`
@@ -1268,6 +1275,7 @@ function setModus(modus, btn) {
 
 async function laadMaand() {
   const jaar = parseInt(document.getElementById('maand-jaar')?.value || new Date().getFullYear());
+  const gekozenMaand = parseInt(document.getElementById('maand-maand')?.value || 0);
   const modus = window._maandModus || 'budget';
   const wrap = document.getElementById('maand-content');
   if (!wrap) return;
@@ -1276,9 +1284,8 @@ async function laadMaand() {
   try {
     const data = await get(`/rapportages/maand?jaar=${jaar}`);
     const isJaar = modus === 'jaar';
+    const heeftMaandFilter = gekozenMaand > 0 && !isJaar;
 
-    // Kolommen
-    const kolommen = isJaar ? MAANDEN.map((m,i) => i+1) : null;
     const headers = isJaar
       ? MAANDEN.map(m => `<th>${m}</th>`).join('') + '<th>Totaal</th>'
       : '<th>Gerealiseerd</th><th>Budget</th>' + (modus === 'perc' ? '<th>% afwijk.</th>' : modus === 'abs' ? '<th>Abs. afwijk.</th>' : '');
@@ -1299,7 +1306,8 @@ async function laadMaand() {
           }
           html += `<td class="${euroClass(jaarTot)}" style="font-weight:600">${euro(jaarTot)}</td>`;
         } else {
-          const g = item.totaal_gerealiseerd, b = item.totaal_budget;
+          const g = heeftMaandFilter ? (item.maanden[gekozenMaand]?.gerealiseerd || 0) : item.totaal_gerealiseerd;
+          const b = heeftMaandFilter ? (item.maanden[gekozenMaand]?.budget || 0) : item.totaal_budget;
           const afw = g - b;
           const perc = b !== 0 ? ((g / b) * 100 - 100).toFixed(1) : '—';
           if (modus === 'budget') {
