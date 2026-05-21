@@ -24,14 +24,8 @@ def haal_saldo(grootboek_id: int, tot_datum: str = None) -> float:
 
 def balans(peildatum: str) -> dict:
     """Genereer een balans op peildatum"""
-    groep_rows = query(
-        "SELECT naam, kant FROM groepen WHERE type = 'Balans' AND actief = 1"
-    )
-    activa_groepen = {g['naam'] for g in groep_rows if g['kant'] == 'Activa'}
-    passiva_groepen = {g['naam'] for g in groep_rows if g['kant'] == 'Passiva'}
-
     gb_rows = query(
-        "SELECT id, nummer, omschrijving, categorie, groep FROM grootboeken WHERE categorie = 'Balans' AND actief = 1 ORDER BY nummer"
+        "SELECT id, nummer, omschrijving, categorie, groep, subgroep FROM grootboeken WHERE categorie = 'Balans' AND actief = 1 ORDER BY nummer"
     )
 
     activa = {}
@@ -46,11 +40,14 @@ def balans(peildatum: str) -> dict:
             'id': gb['id'],
             'nummer': gb['nummer'],
             'omschrijving': gb['omschrijving'],
+            'subgroep': gb['subgroep'],
             'saldo': saldo
         }
-        if groep in activa_groepen:
+        # Activa-groepen
+        if groep in ('Vaste activa', 'Liquide middelen'):
             activa.setdefault(groep, []).append(item)
-        elif groep in passiva_groepen:
+        # Passiva-groepen
+        elif groep in ('Eigen vermogen', 'Schulden'):
             passiva.setdefault(groep, []).append(item)
 
     totaal_activa = sum(i['saldo'] for groep in activa.values() for i in groep)
@@ -70,18 +67,18 @@ def winst_verlies(jaar: int) -> dict:
     datum_van = f"{jaar}-01-01"
     datum_tot = f"{jaar}-12-31"
 
-    groep_rows = query(
-        "SELECT naam FROM groepen WHERE type = 'Winst en Verlies' AND actief = 1 ORDER BY volgorde, naam"
-    )
-    GROEP_VOLGORDE = [g['naam'] for g in groep_rows]
-    inkomsten_groepen = {g['naam'] for g in query(
-        "SELECT naam FROM groepen WHERE type = 'Winst en Verlies' AND naam = 'Inkomsten' AND actief = 1"
-    )}
-
     gb_rows = query(
-        """SELECT id, nummer, omschrijving, groep FROM grootboeken
-           WHERE categorie = 'Winst en Verlies' AND actief = 1 ORDER BY groep, nummer"""
+        """SELECT id, nummer, omschrijving, groep, subgroep FROM grootboeken
+           WHERE categorie = 'Winst en Verlies' AND actief = 1 ORDER BY groep, subgroep, nummer"""
     )
+
+    GROEP_VOLGORDE = [
+        'Inkomsten',
+        'Maandelijkse vaste lasten',
+        'Niet-maandelijkse vaste lasten',
+        'Variabele lasten',
+        'Sparen / reserveringen'
+    ]
 
     resultaat = {}
     for gb in gb_rows:
@@ -108,21 +105,19 @@ def winst_verlies(jaar: int) -> dict:
             'id': gb['id'],
             'nummer': gb['nummer'],
             'omschrijving': gb['omschrijving'],
+            'subgroep': gb['subgroep'],
             'gerealiseerd': totaal,
             'budget': budget,
             'afwijking': round(totaal - budget, 2)
         })
 
-    # Sorteer op volgorde uit de groepen tabel; overige groepen achteraan
-    bekende = {g: resultaat[g] for g in GROEP_VOLGORDE if g in resultaat}
-    overige = {g: v for g, v in resultaat.items() if g not in bekende}
-    gesorteerd = {**bekende, **overige}
-
+    # Sorteer op volgorde
+    gesorteerd = {g: resultaat.get(g, []) for g in GROEP_VOLGORDE if g in resultaat}
     totaal_inkomsten = sum(i['gerealiseerd'] for i in gesorteerd.get('Inkomsten', []))
     totaal_lasten = sum(
         i['gerealiseerd']
-        for g, items in gesorteerd.items() if g not in inkomsten_groepen
-        for i in items
+        for g in ('Maandelijkse vaste lasten', 'Niet-maandelijkse vaste lasten', 'Variabele lasten', 'Sparen / reserveringen')
+        for i in gesorteerd.get(g, [])
     )
 
     return {
@@ -135,15 +130,18 @@ def winst_verlies(jaar: int) -> dict:
 
 def maandoverzicht(jaar: int) -> dict:
     """Genereer een maandoverzicht met gerealiseerd + budget per grootboek per maand"""
-    groep_rows = query(
-        "SELECT naam FROM groepen WHERE type = 'Winst en Verlies' AND actief = 1 ORDER BY volgorde, naam"
-    )
-    GROEP_VOLGORDE = [g['naam'] for g in groep_rows]
-
     gb_rows = query(
-        """SELECT id, nummer, omschrijving, groep FROM grootboeken
-           WHERE categorie = 'Winst en Verlies' AND actief = 1 ORDER BY groep, nummer"""
+        """SELECT id, nummer, omschrijving, groep, subgroep FROM grootboeken
+           WHERE categorie = 'Winst en Verlies' AND actief = 1 ORDER BY groep, subgroep, nummer"""
     )
+
+    GROEP_VOLGORDE = [
+        'Inkomsten',
+        'Maandelijkse vaste lasten',
+        'Niet-maandelijkse vaste lasten',
+        'Variabele lasten',
+        'Sparen / reserveringen'
+    ]
 
     data = {}
     for gb in gb_rows:
@@ -181,20 +179,19 @@ def maandoverzicht(jaar: int) -> dict:
             'id': gb['id'],
             'nummer': gb['nummer'],
             'omschrijving': gb['omschrijving'],
+            'subgroep': gb['subgroep'],
             'maanden': maanden,
             'totaal_gerealiseerd': round(totaal_gerealiseerd, 2),
             'totaal_budget': round(totaal_budget, 2),
         })
 
-    bekende = {g: data[g] for g in GROEP_VOLGORDE if g in data}
-    overige = {g: v for g, v in data.items() if g not in bekende}
-    gesorteerd = {**bekende, **overige}
+    gesorteerd = {g: data.get(g, []) for g in GROEP_VOLGORDE if g in data}
     return {'jaar': jaar, 'groepen': gesorteerd}
 
 def grootboek_saldi(datum: str = None) -> list:
     """Haal alle grootboeknummers op met saldo"""
     rows = query(
-        "SELECT id, nummer, omschrijving, categorie, groep, is_bankrekening, rekening_naam FROM grootboeken WHERE actief = 1 ORDER BY nummer"
+        "SELECT id, nummer, omschrijving, categorie, groep, subgroep, is_bankrekening, rekening_naam FROM grootboeken WHERE actief = 1 ORDER BY nummer"
     )
     result = []
     for gb in rows:
