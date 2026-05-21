@@ -23,17 +23,6 @@ CREATE TABLE IF NOT EXISTS sessies (
     aangemaakt  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- ─── GROEPEN ─────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS groepen (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    naam        TEXT NOT NULL UNIQUE,
-    type        TEXT NOT NULL CHECK(type IN ('Balans', 'Winst en Verlies')),
-    kant        TEXT CHECK(kant IS NULL OR kant IN ('Activa', 'Passiva')),
-    volgorde    INTEGER NOT NULL DEFAULT 0,
-    actief      INTEGER NOT NULL DEFAULT 1,
-    aangemaakt  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 -- ─── GROOTBOEKREKENINGEN ─────────────────────────────────────
 CREATE TABLE IF NOT EXISTS grootboeken (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -576,7 +576,6 @@ tbody td.actions { white-space: nowrap; }
 
       <div class="nav-section">Beheer</div>
       <div class="nav-item" onclick="nav('grootboeken')"><span class="icon">📒</span> Grootboeken</div>
-      <div class="nav-item beheerder-only" onclick="nav('groepen')"><span class="icon">🏷</span> Groepen</div>
       <div class="nav-item" onclick="nav('bankrekeningen')"><span class="icon">🏦</span> Bankrekeningen</div>
       <div class="nav-item" onclick="nav('matchregels')"><span class="icon">⚡</span> Matchregels</div>
       <div class="nav-item" onclick="nav('budgetten')"><span class="icon">🎯</span> Budgetten</div>
@@ -679,17 +678,16 @@ document.getElementById('login-pass').addEventListener('keydown', e => {
 const PAGINA_TITELS = {
   dashboard: 'Dashboard', import: 'Importeren', wachtrij: 'Te boeken',
   transacties: 'Alle transacties', balans: 'Balans', wenv: 'Winst & Verlies',
-  maand: 'Maandoverzicht', grootboeken: 'Grootboekrekeningen', groepen: 'Groepen beheren',
-  bankrekeningen: 'Bankrekeningen', matchregels: 'Matchregels', budgetten: 'Budgetten',
-  openingsbalans: 'Openingsbalans', gebruikers: 'Gebruikersbeheer'
+  maand: 'Maandoverzicht', grootboeken: 'Grootboekrekeningen', bankrekeningen: 'Bankrekeningen',
+  matchregels: 'Matchregels', budgetten: 'Budgetten', openingsbalans: 'Openingsbalans',
+  gebruikers: 'Gebruikersbeheer'
 };
 
 const PAGINA_RENDERERS = {
   dashboard: renderDashboard, import: renderImport, wachtrij: renderWachtrij,
   transacties: renderTransacties, balans: renderBalans, wenv: renderWenv,
-  maand: renderMaand, grootboeken: renderGrootboeken, groepen: renderGroepen,
-  bankrekeningen: renderBankrekeningen, matchregels: renderMatchregels,
-  budgetten: renderBudgetten, openingsbalans: renderOpeningsbalans,
+  maand: renderMaand, grootboeken: renderGrootboeken, bankrekeningen: renderBankrekeningen,
+  matchregels: renderMatchregels, budgetten: renderBudgetten, openingsbalans: renderOpeningsbalans,
   gebruikers: renderGebruikers
 };
 
@@ -1373,6 +1371,9 @@ async function laadMaand() {
 // ════════════════════════════════════════════
 // GROOTBOEKEN
 // ════════════════════════════════════════════
+const GROEPEN_BALANS = ['Vaste activa','Liquide middelen','Eigen vermogen','Schulden'];
+const GROEPEN_WENV = ['Inkomsten','Maandelijkse vaste lasten','Niet-maandelijkse vaste lasten','Variabele lasten','Sparen / reserveringen'];
+const SUBGROEPEN = ['Abonnementen','Boodschappen','Kinderopvang','Leningen','Nutsvoorzieningen','Verzekeringen'];
 
 async function renderGrootboeken() {
   if (isBeheerder()) {
@@ -1395,11 +1396,12 @@ async function laadGrootboeken() {
     const wenv = gb.filter(g => g.categorie === 'Winst en Verlies');
 
     const tabelHtml = (items) => `<div class="table-wrap"><table>
-      <thead><tr><th>Nummer</th><th>Omschrijving</th><th>Groep</th><th>Type</th>${isBeheerder() ? '<th>Acties</th>' : ''}</tr></thead>
+      <thead><tr><th>Nummer</th><th>Omschrijving</th><th>Groep</th><th>Subgroep</th><th>Type</th>${isBeheerder() ? '<th>Acties</th>' : ''}</tr></thead>
       <tbody>${items.map(g => `<tr>
         <td class="mono bold">${escHtml(g.nummer)}</td>
         <td class="bold">${escHtml(g.omschrijving)}</td>
         <td>${escHtml(g.groep)}</td>
+        <td class="text-muted">${escHtml(g.subgroep || '—')}</td>
         <td>${g.is_bankrekening ? '<span class="badge badge-blue">Bank</span>' : '<span class="badge badge-gray">Normaal</span>'}</td>
         ${isBeheerder() ? `<td class="actions">
           <button class="btn btn-secondary btn-xs" onclick="openGrootboekModal(${JSON.stringify(g).replace(/"/g,'&quot;')})">Bewerken</button>
@@ -1427,9 +1429,8 @@ function switchGbTab(idx, btn) {
   [0,1].forEach(i => document.getElementById(`gb-tab-${i}`)?.classList.toggle('hidden', i !== idx));
 }
 
-async function openGrootboekModal(gb = null) {
+function openGrootboekModal(gb = null) {
   const isNieuw = !gb;
-  const alleGroepen = await get('/groepen');
   openModal(`
     <div class="modal-header">
       <span class="modal-title">${isNieuw ? 'Nieuw grootboek' : 'Grootboek bewerken'}</span>
@@ -1453,9 +1454,18 @@ async function openGrootboekModal(gb = null) {
         <label>Omschrijving</label>
         <input id="gb-omschr" value="${escHtml(gb?.omschrijving||'')}" placeholder="Bijv. Boodschappen">
       </div>
-      <div class="form-group">
-        <label>Groep</label>
-        <select id="gb-groep"></select>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Groep</label>
+          <select id="gb-groep"></select>
+        </div>
+        <div class="form-group">
+          <label>Subgroep</label>
+          <select id="gb-subgroep">
+            <option value="">— Geen —</option>
+            ${SUBGROEPEN.map(s => `<option ${gb?.subgroep===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
       </div>
       <div class="form-group">
         <label><input type="checkbox" id="gb-isbank" ${gb?.is_bankrekening?'checked':''} onchange="toggleBankVelden()"> Dit is een bankrekening</label>
@@ -1479,16 +1489,15 @@ async function openGrootboekModal(gb = null) {
       <button class="btn btn-primary" onclick="slaGrootboekOp(${gb?.id||'null'})">${isNieuw ? 'Aanmaken' : 'Opslaan'}</button>
     </div>
   `);
-  window._gbGroepen = alleGroepen;
   updateGbGroepen(gb?.groep);
 }
 
 function updateGbGroepen(huidig = null) {
   const cat = document.getElementById('gb-categorie')?.value;
-  const groepen = (window._gbGroepen || []).filter(g => g.type === cat);
+  const groepen = cat === 'Balans' ? GROEPEN_BALANS : GROEPEN_WENV;
   const sel = document.getElementById('gb-groep');
   if (!sel) return;
-  sel.innerHTML = groepen.map(g => `<option ${g.naam === huidig ? 'selected' : ''}>${escHtml(g.naam)}</option>`).join('');
+  sel.innerHTML = groepen.map(g => `<option ${g === huidig ? 'selected' : ''}>${g}</option>`).join('');
 }
 
 function toggleBankVelden() {
@@ -1503,6 +1512,7 @@ async function slaGrootboekOp(gbId) {
     omschrijving: document.getElementById('gb-omschr').value.trim(),
     categorie: document.getElementById('gb-categorie').value,
     groep: document.getElementById('gb-groep').value,
+    subgroep: document.getElementById('gb-subgroep').value || null,
     is_bankrekening: document.getElementById('gb-isbank').checked ? 1 : 0,
     iban: document.getElementById('gb-iban')?.value.trim() || null,
     rekening_naam: document.getElementById('gb-reknaam')?.value.trim() || null,
@@ -1526,140 +1536,6 @@ async function verwijderGrootboek(gbId, naam) {
   try {
     await del(`/grootboeken/${gbId}`);
     toast('Verwijderd', 'success'); laadGrootboeken();
-  } catch(e) { toast(e.message, 'error'); }
-}
-
-// ════════════════════════════════════════════
-// GROEPEN
-// ════════════════════════════════════════════
-async function renderGroepen() {
-  if (isBeheerder()) {
-    document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="openGroepModal()">+ Nieuwe groep</button>`;
-  }
-  setContent('<div id="groepen-lijst"><div class="flex-center" style="padding:60px"><div class="spinner"></div></div></div>');
-  laadGroepen();
-}
-
-async function laadGroepen() {
-  const wrap = document.getElementById('groepen-lijst');
-  try {
-    const groepen = await get('/groepen');
-    if (groepen.length === 0) {
-      wrap.innerHTML = '<div class="empty"><div class="empty-icon">🏷</div><div class="empty-text">Nog geen groepen aangemaakt</div></div>';
-      return;
-    }
-    const balans = groepen.filter(g => g.type === 'Balans');
-    const wenv = groepen.filter(g => g.type === 'Winst en Verlies');
-
-    const tabelHtml = (items) => `<div class="table-wrap"><table>
-      <thead><tr><th>Naam</th><th>Type</th><th>Kant</th><th>Volgorde</th>${isBeheerder() ? '<th>Acties</th>' : ''}</tr></thead>
-      <tbody>${items.map(g => `<tr>
-        <td class="bold">${escHtml(g.naam)}</td>
-        <td>${g.type === 'Balans' ? '<span class="badge badge-blue">Balans</span>' : '<span class="badge badge-teal">W&V</span>'}</td>
-        <td class="text-muted">${escHtml(g.kant || '—')}</td>
-        <td class="mono">${g.volgorde}</td>
-        ${isBeheerder() ? `<td class="actions">
-          <button class="btn btn-secondary btn-xs" onclick="openGroepModal(${JSON.stringify(g).replace(/"/g,'&quot;')})">Bewerken</button>
-          <button class="btn btn-danger btn-xs" onclick="verwijderGroep(${g.id}, '${escHtml(g.naam)}')">Verwijderen</button>
-        </td>` : ''}
-      </tr>`).join('')}
-      </tbody></table></div>`;
-
-    wrap.innerHTML = `
-      <div class="tabs" id="groepen-tabs">
-        <button class="tab active" onclick="switchGroepenTab(0,this)">Balans (${balans.length})</button>
-        <button class="tab" onclick="switchGroepenTab(1,this)">Winst en Verlies (${wenv.length})</button>
-      </div>
-      <div id="groepen-tab-0" class="card">${tabelHtml(balans)}</div>
-      <div id="groepen-tab-1" class="card hidden">${tabelHtml(wenv)}</div>
-    `;
-  } catch(e) {
-    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
-  }
-}
-
-function switchGroepenTab(idx, btn) {
-  document.querySelectorAll('#groepen-tabs .tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  [0,1].forEach(i => document.getElementById(`groepen-tab-${i}`)?.classList.toggle('hidden', i !== idx));
-}
-
-function openGroepModal(g = null) {
-  const isNieuw = !g;
-  openModal(`
-    <div class="modal-header">
-      <span class="modal-title">${isNieuw ? 'Nieuwe groep' : 'Groep bewerken'}</span>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label>Naam</label>
-        <input id="gr-naam" value="${escHtml(g?.naam||'')}" placeholder="Bijv. Variabele lasten">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Type</label>
-          <select id="gr-type" onchange="updateGroepKantVeld()">
-            <option value="Balans" ${g?.type==='Balans'?'selected':''}>Balans</option>
-            <option value="Winst en Verlies" ${g?.type==='Winst en Verlies'?'selected':''}>Winst en Verlies</option>
-          </select>
-        </div>
-        <div class="form-group" id="gr-kant-groep" ${g?.type !== 'Balans' ? 'style="display:none"' : ''}>
-          <label>Kant</label>
-          <select id="gr-kant">
-            <option value="Activa" ${g?.kant==='Activa'?'selected':''}>Activa</option>
-            <option value="Passiva" ${g?.kant==='Passiva'?'selected':''}>Passiva</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Volgorde</label>
-        <input id="gr-volgorde" type="number" value="${g?.volgorde ?? 0}" placeholder="0">
-        <div class="help-text">Lagere waarde = eerder getoond in overzichten</div>
-      </div>
-      <div class="form-error" id="gr-fout"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal()">Annuleren</button>
-      <button class="btn btn-primary" onclick="slaGroepOp(${g?.id||'null'})">${isNieuw ? 'Aanmaken' : 'Opslaan'}</button>
-    </div>
-  `);
-}
-
-function updateGroepKantVeld() {
-  const type = document.getElementById('gr-type')?.value;
-  const kantGroep = document.getElementById('gr-kant-groep');
-  if (kantGroep) kantGroep.style.display = type === 'Balans' ? '' : 'none';
-}
-
-async function slaGroepOp(grId) {
-  const isNieuw = !grId;
-  const type = document.getElementById('gr-type').value;
-  const data = {
-    naam: document.getElementById('gr-naam').value.trim(),
-    type,
-    kant: type === 'Balans' ? (document.getElementById('gr-kant')?.value || null) : null,
-    volgorde: parseInt(document.getElementById('gr-volgorde').value) || 0,
-  };
-  if (!data.naam) {
-    document.getElementById('gr-fout').textContent = 'Naam is verplicht';
-    return;
-  }
-  try {
-    if (isNieuw) await post('/groepen', data);
-    else await put(`/groepen/${grId}`, data);
-    closeModal(); toast(isNieuw ? 'Groep aangemaakt' : 'Bijgewerkt', 'success');
-    laadGroepen();
-  } catch(e) {
-    document.getElementById('gr-fout').textContent = e.message;
-  }
-}
-
-async function verwijderGroep(id, naam) {
-  if (!confirm(`Groep "${naam}" verwijderen?`)) return;
-  try {
-    await del(`/groepen/${id}`);
-    toast('Verwijderd', 'success'); laadGroepen();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -1857,10 +1733,9 @@ async function laadBudgetten() {
   const wrap = document.getElementById('budget-content');
   if (!wrap) return;
   try {
-    const [gb, budgetten, groepen] = await Promise.all([
+    const [gb, budgetten] = await Promise.all([
       get('/grootboeken'),
-      get(`/budgetten?jaar=${jaar}`),
-      get('/groepen?type=Winst+en+Verlies')
+      get(`/budgetten?jaar=${jaar}`)
     ]);
     const gbWenv = gb.filter(g => g.categorie === 'Winst en Verlies');
 
@@ -1872,11 +1747,9 @@ async function laadBudgetten() {
       <thead><tr><th>Grootboek</th>${MAANDEN.map(m=>`<th>${m}</th>`).join('')}<th>Totaal</th></tr></thead>
       <tbody>`;
 
-    const GROEP_VOLGORDE = groepen.map(g => g.naam);
+    const GROEP_VOLGORDE = ['Inkomsten','Maandelijkse vaste lasten','Niet-maandelijkse vaste lasten','Variabele lasten','Sparen / reserveringen'];
     const gbPerGroep = {};
     gbWenv.forEach(g => { (gbPerGroep[g.groep] = gbPerGroep[g.groep]||[]).push(g); });
-    // Voeg groepen toe die niet in de volgorde staan
-    Object.keys(gbPerGroep).forEach(g => { if (!GROEP_VOLGORDE.includes(g)) GROEP_VOLGORDE.push(g); });
 
     for (const groep of GROEP_VOLGORDE) {
       const items = gbPerGroep[groep] || [];

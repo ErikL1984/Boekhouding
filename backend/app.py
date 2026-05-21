@@ -115,61 +115,6 @@ def api_gebruiker_verwijderen(uid):
     auth_module.verwijder_gebruiker(uid)
     return json_response({'bericht': 'Verwijderd'})
 
-# ─── GROEPEN ─────────────────────────────────────────────────
-
-@app.route('/api/groepen', methods=['GET'])
-@auth_required
-def api_groepen():
-    type_ = request.args.get('type', '')
-    sql = "SELECT * FROM groepen WHERE actief = 1"
-    params = []
-    if type_:
-        sql += " AND type = ?"
-        params.append(type_)
-    sql += " ORDER BY type, volgorde, naam"
-    rows = database.query(sql, params)
-    return json_response([dict(r) for r in rows])
-
-@app.route('/api/groepen', methods=['POST'])
-@beheerder_required
-def api_groep_aanmaken():
-    data = request.json or {}
-    if not data.get('naam') or not data.get('type'):
-        return json_response({'error': 'Naam en type zijn verplicht'}, 400)
-    bestaand = database.query("SELECT id FROM groepen WHERE naam = ?", (data['naam'],), one=True)
-    if bestaand:
-        return json_response({'error': 'Groep bestaat al'}, 400)
-    gid = database.execute(
-        "INSERT INTO groepen (naam, type, kant, volgorde) VALUES (?, ?, ?, ?)",
-        (data['naam'], data['type'], data.get('kant'), data.get('volgorde', 0))
-    )
-    return json_response({'id': gid, 'bericht': 'Groep aangemaakt'}, 201)
-
-@app.route('/api/groepen/<int:gid>', methods=['PUT'])
-@beheerder_required
-def api_groep_update(gid):
-    data = request.json or {}
-    database.execute(
-        "UPDATE groepen SET naam=?, type=?, kant=?, volgorde=? WHERE id=?",
-        (data.get('naam'), data.get('type'), data.get('kant'), data.get('volgorde', 0), gid)
-    )
-    return json_response({'bericht': 'Bijgewerkt'})
-
-@app.route('/api/groepen/<int:gid>', methods=['DELETE'])
-@beheerder_required
-def api_groep_verwijderen(gid):
-    groep_row = database.query("SELECT naam FROM groepen WHERE id = ?", (gid,), one=True)
-    if not groep_row:
-        return json_response({'error': 'Niet gevonden'}, 404)
-    in_gebruik = database.query(
-        "SELECT COUNT(*) as n FROM grootboeken WHERE groep = ? AND actief = 1",
-        (groep_row['naam'],), one=True
-    )
-    if in_gebruik and in_gebruik['n'] > 0:
-        return json_response({'error': 'Groep is in gebruik bij grootboekrekeningen'}, 400)
-    database.execute("UPDATE groepen SET actief = 0 WHERE id = ?", (gid,))
-    return json_response({'bericht': 'Verwijderd'})
-
 # ─── GROOTBOEKEN ─────────────────────────────────────────────
 
 @app.route('/api/grootboeken', methods=['GET'])
@@ -189,10 +134,10 @@ def api_grootboek_aanmaken():
     if bestaand:
         return json_response({'error': 'Nummer bestaat al'}, 400)
     gid = database.execute(
-        """INSERT INTO grootboeken (nummer, omschrijving, categorie, groep, is_bankrekening, iban, rekening_naam)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO grootboeken (nummer, omschrijving, categorie, groep, subgroep, is_bankrekening, iban, rekening_naam)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (data.get('nummer'), data.get('omschrijving'), data.get('categorie'),
-         data.get('groep'), data.get('is_bankrekening', 0),
+         data.get('groep'), data.get('subgroep'), data.get('is_bankrekening', 0),
          data.get('iban'), data.get('rekening_naam'))
     )
     return json_response({'id': gid, 'bericht': 'Grootboek aangemaakt'}, 201)
@@ -202,10 +147,10 @@ def api_grootboek_aanmaken():
 def api_grootboek_update(gid):
     data = request.json or {}
     database.execute(
-        """UPDATE grootboeken SET omschrijving=?, categorie=?, groep=?,
+        """UPDATE grootboeken SET omschrijving=?, categorie=?, groep=?, subgroep=?,
            is_bankrekening=?, iban=?, rekening_naam=? WHERE id=?""",
         (data.get('omschrijving'), data.get('categorie'), data.get('groep'),
-         data.get('is_bankrekening', 0),
+         data.get('subgroep'), data.get('is_bankrekening', 0),
          data.get('iban'), data.get('rekening_naam'), gid)
     )
     return json_response({'bericht': 'Bijgewerkt'})
@@ -559,36 +504,10 @@ def api_saldi():
     datum = request.args.get('datum', None)
     return json_response(grootboek_saldi(datum))
 
-_DEFAULT_GROEPEN = [
-    ("Vaste activa",                   "Balans",           "Activa",  10),
-    ("Liquide middelen",               "Balans",           "Activa",  20),
-    ("Eigen vermogen",                 "Balans",           "Passiva", 30),
-    ("Schulden",                       "Balans",           "Passiva", 40),
-    ("Inkomsten",                      "Winst en Verlies", None,      10),
-    ("Maandelijkse vaste lasten",      "Winst en Verlies", None,      20),
-    ("Niet-maandelijkse vaste lasten", "Winst en Verlies", None,      30),
-    ("Variabele lasten",               "Winst en Verlies", None,      40),
-    ("Sparen / reserveringen",         "Winst en Verlies", None,      50),
-    ("Abonnementen",                   "Winst en Verlies", None,      60),
-    ("Boodschappen",                   "Winst en Verlies", None,      70),
-    ("Kinderopvang",                   "Winst en Verlies", None,      80),
-    ("Leningen",                       "Winst en Verlies", None,      90),
-    ("Nutsvoorzieningen",              "Winst en Verlies", None,      100),
-    ("Verzekeringen",                  "Winst en Verlies", None,      110),
-]
-
 # ─── STARTUP ─────────────────────────────────────────────────
 
 def initialiseer():
     database.init_db()
-    # Populeer groepen tabel als deze leeg is (migratie voor bestaande databases)
-    n = database.query("SELECT COUNT(*) as n FROM groepen", one=True)
-    if n and n['n'] == 0:
-        for naam, type_, kant, volgorde in _DEFAULT_GROEPEN:
-            database.execute(
-                "INSERT OR IGNORE INTO groepen (naam, type, kant, volgorde) VALUES (?, ?, ?, ?)",
-                (naam, type_, kant, volgorde)
-            )
     # Maak standaard beheerder aan als geen gebruikers bestaan
     gebruikers = database.query("SELECT COUNT(*) as n FROM gebruikers", one=True)
     if gebruikers and gebruikers['n'] == 0:
