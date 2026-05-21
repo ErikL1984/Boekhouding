@@ -913,7 +913,10 @@ async function renderWachtrij() {
       return;
     }
 
-    document.getElementById('topbar-actions').innerHTML = `<span class="text-sm text-muted">${transacties.length} transactie(s) te boeken</span>`;
+    document.getElementById('topbar-actions').innerHTML = `
+      <span class="text-sm text-muted">${transacties.length} transactie(s) te boeken</span>
+      <button class="btn btn-secondary btn-sm" onclick="hermatchen()">↺ Opnieuw matchen</button>
+    `;
 
     setContent(`
       <div class="boek-wachtrij" id="boek-wachtrij">
@@ -967,6 +970,20 @@ async function boekSnel(transId, gbId, gbNaam) {
     const wachtrij = document.getElementById('boek-wachtrij');
     if (wachtrij && !wachtrij.children.length) {
       setContent(`<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Alles geboekt!</div></div>`);
+    }
+  } catch(e) {
+    toast('Fout: ' + e.message, 'error');
+  }
+}
+
+async function hermatchen() {
+  try {
+    const r = await post('/transacties/hermatchen', {});
+    if (r.auto_geboekt > 0) {
+      toast(`${r.auto_geboekt} transactie(s) automatisch geboekt`, 'success');
+      renderWachtrij();
+    } else {
+      toast('Geen nieuwe matches gevonden', 'info');
     }
   } catch(e) {
     toast('Fout: ' + e.message, 'error');
