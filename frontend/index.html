@@ -744,11 +744,9 @@ function setContent(html) {
 
 async function refreshWachtrijBadge() {
   try {
-    const rows = await get('/transacties?status=nieuw&limit=1');
-    // We need count
-    const all = await get('/transacties?status=nieuw&limit=200');
+    const data = await get('/transacties/count?status=nieuw');
     const badge = document.getElementById('wachtrij-badge');
-    badge.textContent = all.length > 0 ? all.length : '';
+    badge.textContent = data.count > 0 ? data.count : '';
   } catch(e) {}
 }
 
@@ -759,9 +757,9 @@ function isBeheerder() { return S.gebruiker?.rol === 'beheerder'; }
 // ════════════════════════════════════════════
 async function renderDashboard() {
   try {
-    const [saldi, wachtrij, maandData] = await Promise.all([
+    const [saldi, wachtrijCount, maandData] = await Promise.all([
       get('/rapportages/saldi'),
-      get('/transacties?status=nieuw&limit=200'),
+      get('/transacties/count?status=nieuw'),
       get('/rapportages/wenv?jaar=' + new Date().getFullYear())
     ]);
 
@@ -777,7 +775,7 @@ async function renderDashboard() {
         </div>
         <div class="stat-card amber">
           <div class="stat-label">Te boeken</div>
-          <div class="stat-value">${wachtrij.length}</div>
+          <div class="stat-value">${wachtrijCount.count}</div>
           <div class="stat-sub">Transacties wachten op boeking</div>
         </div>
         <div class="stat-card ${netto >= 0 ? 'green' : 'red'}">
@@ -899,26 +897,44 @@ function statMini(label, waarde, kleur) {
 // ════════════════════════════════════════════
 // WACHTRIJ (handmatig boeken)
 // ════════════════════════════════════════════
-async function renderWachtrij() {
+const WACHTRIJ_PER_PAGINA = 50;
+let _wachtrijPagina = 0;
+
+async function renderWachtrij(pagina) {
+  if (pagina === undefined) pagina = 0;
+  _wachtrijPagina = pagina;
   try {
-    const [transacties, grootboeken] = await Promise.all([
-      get('/transacties?status=nieuw&limit=100'),
-      get('/grootboeken')
+    const offset = pagina * WACHTRIJ_PER_PAGINA;
+    const [transacties, grootboeken, countData] = await Promise.all([
+      get(`/transacties?status=nieuw&limit=${WACHTRIJ_PER_PAGINA}&offset=${offset}`),
+      get('/grootboeken'),
+      get('/transacties/count?status=nieuw')
     ]);
 
+    const totaal = countData.count;
+    const aantalPaginas = Math.ceil(totaal / WACHTRIJ_PER_PAGINA);
     const gbWenv = grootboeken.filter(g => g.categorie === 'Winst en Verlies');
 
-    if (transacties.length === 0) {
+    if (totaal === 0) {
+      document.getElementById('topbar-actions').innerHTML = '';
       setContent(`<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Geen openstaande transacties — alles is geboekt!</div></div>`);
       return;
     }
 
-    document.getElementById('topbar-actions').innerHTML = `<span class="text-sm text-muted">${transacties.length} transactie(s) te boeken</span>`;
+    document.getElementById('topbar-actions').innerHTML = `<span class="text-sm text-muted">${totaal} transactie(s) te boeken</span>`;
+
+    const paginering = aantalPaginas > 1 ? `
+      <div style="display:flex;justify-content:center;align-items:center;gap:12px;padding:16px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="renderWachtrij(${pagina - 1})" ${pagina === 0 ? 'disabled' : ''}>← Vorige</button>
+        <span style="font-size:0.85rem;color:var(--text2)">Pagina ${pagina + 1} van ${aantalPaginas} · ${offset + 1}–${Math.min(offset + WACHTRIJ_PER_PAGINA, totaal)} van ${totaal}</span>
+        <button class="btn btn-secondary btn-sm" onclick="renderWachtrij(${pagina + 1})" ${pagina >= aantalPaginas - 1 ? 'disabled' : ''}>Volgende →</button>
+      </div>` : '';
 
     setContent(`
       <div class="boek-wachtrij" id="boek-wachtrij">
         ${transacties.map(t => renderTransCard(t, gbWenv)).join('')}
       </div>
+      ${paginering}
     `);
   } catch(e) {
     setContent(`<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`);
@@ -928,7 +944,7 @@ async function renderWachtrij() {
 function renderTransCard(t, gbLijst) {
   const kleur = t.bedrag < 0 ? 'neg' : 'pos';
   const knoppen = gbLijst.map(gb => `
-    <button class="btn-gb" onclick="boekSnel(${t.id}, ${gb.id}, '${escHtml(gb.omschrijving)}')">
+    <button class="btn-gb" onclick="boekSnel(${t.id}, ${gb.id}, '${escHtml(gb.omschrijving)}', ${t.bedrag})">
       <div style="font-size:0.72rem;color:var(--text3)">${escHtml(gb.nummer)}</div>
       <div>${escHtml(gb.omschrijving)}</div>
     </button>
@@ -952,13 +968,10 @@ function renderTransCard(t, gbLijst) {
   `;
 }
 
-async function boekSnel(transId, gbId, gbNaam) {
+async function boekSnel(transId, gbId, gbNaam, bedrag) {
   try {
-    const trans = await get('/transacties?status=nieuw&limit=200');
-    const t = trans.find(x => x.id === transId);
-    if (!t) { toast('Transactie niet gevonden', 'error'); return; }
     await post(`/transacties/${transId}/boek`, {
-      regels: [{ grootboek_id: gbId, bedrag: Math.abs(t.bedrag) }],
+      regels: [{ grootboek_id: gbId, bedrag: Math.abs(bedrag) }],
       omschrijving: gbNaam
     });
     document.getElementById(`tc-${transId}`)?.remove();
@@ -966,7 +979,7 @@ async function boekSnel(transId, gbId, gbNaam) {
     refreshWachtrijBadge();
     const wachtrij = document.getElementById('boek-wachtrij');
     if (wachtrij && !wachtrij.children.length) {
-      setContent(`<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Alles geboekt!</div></div>`);
+      renderWachtrij(_wachtrijPagina);
     }
   } catch(e) {
     toast('Fout: ' + e.message, 'error');
