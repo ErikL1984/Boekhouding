@@ -226,6 +226,16 @@ def api_transacties():
     )
     return json_response([dict(r) for r in rows])
 
+@app.route('/api/transacties/count', methods=['GET'])
+@auth_required
+def api_transacties_count():
+    status = request.args.get('status', 'nieuw')
+    row = database.query(
+        "SELECT COUNT(*) as count FROM banktransacties WHERE status = ?",
+        (status,), one=True
+    )
+    return json_response({'count': row['count'] if row else 0})
+
 @app.route('/api/transacties/alle', methods=['GET'])
 @auth_required
 def api_transacties_alle():
