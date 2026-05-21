@@ -67,6 +67,29 @@ def haal_eigen_ibans() -> set:
     rows = query("SELECT iban FROM bankrekeningen WHERE actief = 1")
     return {r['iban'].replace(' ', '').upper() for r in rows}
 
+def maak_bankrekening_aan(iban: str) -> int:
+    """Maak automatisch een nieuw grootboek en bankrekening aan voor een onbekend IBAN"""
+    bestaande_nummers = {r['nummer'] for r in query("SELECT nummer FROM grootboeken")}
+    nummer = None
+    for n in range(1100, 9999):
+        if str(n) not in bestaande_nummers:
+            nummer = str(n)
+            break
+
+    tijdelijke_naam = f"Bankrekening {iban[-4:]}"
+
+    gb_id = execute(
+        """INSERT INTO grootboeken
+           (nummer, omschrijving, categorie, groep, is_bankrekening, iban, rekening_naam)
+           VALUES (?, ?, 'Balans', 'Liquide middelen', 1, ?, ?)""",
+        (nummer, tijdelijke_naam, iban, tijdelijke_naam)
+    )
+    execute(
+        "INSERT INTO bankrekeningen (naam, iban, grootboek_id) VALUES (?, ?, ?)",
+        (tijdelijke_naam, iban, gb_id)
+    )
+    return gb_id
+
 def haal_matchregels() -> list:
     rows = query(
         "SELECT m.id, m.naam, m.conditie, m.grootboek_id, g.nummer as gb_nummer, g.omschrijving as gb_omschrijving "
@@ -88,7 +111,7 @@ def importeer_csv(csv_inhoud: str, gebruiker_id: int) -> Dict:
     Importeer Rabobank CSV.
     Returns: { 'nieuw': int, 'overgeslagen': int, 'auto_geboekt': int, 'handmatig': int, 'fouten': list }
     """
-    resultaat = {'nieuw': 0, 'overgeslagen': 0, 'auto_geboekt': 0, 'handmatig': 0, 'fouten': []}
+    resultaat = {'nieuw': 0, 'overgeslagen': 0, 'auto_geboekt': 0, 'handmatig': 0, 'fouten': [], 'nieuw_bankrekeningen': []}
 
     eigen_ibans = haal_eigen_ibans()
     matchregels = haal_matchregels()
@@ -117,6 +140,12 @@ def importeer_csv(csv_inhoud: str, gebruiker_id: int) -> Dict:
             if not iban or not volgnummer:
                 resultaat['fouten'].append(f"Rij {rijnr}: ontbrekend IBAN of volgnummer")
                 continue
+
+            # Automatisch nieuwe bankrekening aanmaken als IBAN onbekend is
+            if iban not in eigen_ibans:
+                maak_bankrekening_aan(iban)
+                eigen_ibans.add(iban)
+                resultaat['nieuw_bankrekeningen'].append({'iban': iban, 'naam': f"Bankrekening {iban[-4:]}"})
 
             # Duplicaatcontrole
             bestaand = query(
