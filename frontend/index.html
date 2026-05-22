@@ -297,6 +297,7 @@ tbody td.actions { white-space: nowrap; }
 }
 .badge-blue { background: rgba(37,99,235,0.2); color: var(--blue-l); }
 .badge-teal { background: rgba(13,148,136,0.2); color: var(--teal-l); }
+.badge-green { background: rgba(22,163,74,0.2); color: #4ade80; }
 .badge-amber { background: rgba(217,119,6,0.2); color: #fbbf24; }
 .badge-red { background: rgba(220,38,38,0.2); color: #f87171; }
 .badge-gray { background: rgba(100,116,139,0.2); color: var(--slate-l); }
@@ -919,7 +920,7 @@ async function renderWachtrij() {
     ]);
 
     const totaal = countResult.count;
-    const gbWenv = grootboeken.filter(g => g.categorie === 'Winst en Verlies');
+    const gbWenv = grootboeken.filter(g => g.categorie === 'Winst en Verlies' && g.snelboeken);
 
     if (totaal === 0) {
       setContent(`<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Geen openstaande transacties — alles is geboekt!</div></div>`);
@@ -1481,13 +1482,14 @@ async function laadGrootboeken() {
     const wenv = gb.filter(g => g.categorie === 'Winst en Verlies');
 
     const tabelHtml = (items) => `<div class="table-wrap"><table>
-      <thead><tr><th>Nummer</th><th>Omschrijving</th><th>Groep</th><th>Subgroep</th><th>Type</th>${isBeheerder() ? '<th>Acties</th>' : ''}</tr></thead>
+      <thead><tr><th>Nummer</th><th>Omschrijving</th><th>Groep</th><th>Subgroep</th><th>Type</th><th>Snelboeken</th>${isBeheerder() ? '<th>Acties</th>' : ''}</tr></thead>
       <tbody>${items.map(g => `<tr>
         <td class="mono bold">${escHtml(g.nummer)}</td>
         <td class="bold">${escHtml(g.omschrijving)}</td>
         <td>${escHtml(g.groep)}</td>
         <td class="text-muted">${escHtml(g.subgroep || '—')}</td>
         <td>${g.is_bankrekening ? '<span class="badge badge-blue">Bank</span>' : '<span class="badge badge-gray">Normaal</span>'}</td>
+        <td>${g.snelboeken ? '<span class="badge badge-green">✓</span>' : '<span class="text-muted">—</span>'}</td>
         ${isBeheerder() ? `<td class="actions">
           <button class="btn btn-secondary btn-xs" onclick="openGrootboekModal(${JSON.stringify(g).replace(/"/g,'&quot;')})">Bewerken</button>
           <button class="btn btn-danger btn-xs" onclick="verwijderGrootboek(${g.id}, '${escHtml(g.omschrijving)}')">Verwijderen</button>
@@ -1553,6 +1555,9 @@ function openGrootboekModal(gb = null) {
         </div>
       </div>
       <div class="form-group">
+        <label><input type="checkbox" id="gb-snelboeken" ${gb?.snelboeken?'checked':''}> Tonen als snelboek-knop in 'Te Boeken'</label>
+      </div>
+      <div class="form-group">
         <label><input type="checkbox" id="gb-isbank" ${gb?.is_bankrekening?'checked':''} onchange="toggleBankVelden()"> Dit is een bankrekening</label>
       </div>
       <div id="bank-velden" class="${gb?.is_bankrekening ? '' : 'hidden'}">
@@ -1598,6 +1603,7 @@ async function slaGrootboekOp(gbId) {
     categorie: document.getElementById('gb-categorie').value,
     groep: document.getElementById('gb-groep').value,
     subgroep: document.getElementById('gb-subgroep').value || null,
+    snelboeken: document.getElementById('gb-snelboeken').checked ? 1 : 0,
     is_bankrekening: document.getElementById('gb-isbank').checked ? 1 : 0,
     iban: document.getElementById('gb-iban')?.value.trim() || null,
     rekening_naam: document.getElementById('gb-reknaam')?.value.trim() || null,

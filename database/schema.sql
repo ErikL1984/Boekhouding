@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS grootboeken (
     is_bankrekening INTEGER NOT NULL DEFAULT 0,
     iban        TEXT,                   -- alleen voor bankrekeningen
     rekening_naam TEXT,                 -- bijv. 'Betaalrekening gezin'
+    snelboeken  INTEGER NOT NULL DEFAULT 0,
     actief      INTEGER NOT NULL DEFAULT 1,
     aangemaakt  TEXT NOT NULL DEFAULT (datetime('now'))
 );
