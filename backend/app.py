@@ -130,7 +130,7 @@ def api_grootboeken():
 def api_grootboek_aanmaken():
     data = request.json or {}
     # Valideer uniek nummer
-    bestaand = database.query("SELECT id FROM grootboeken WHERE nummer = ?", (data.get('nummer'),), one=True)
+    bestaand = database.query("SELECT id FROM grootboeken WHERE nummer = ? AND actief = 1", (data.get('nummer'),), one=True)
     if bestaand:
         return json_response({'error': 'Nummer bestaat al'}, 400)
     gid = database.execute(
