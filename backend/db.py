@@ -19,6 +19,12 @@ def init_db():
     conn = get_db()
     with open(schema_path, 'r') as f:
         conn.executescript(f.read())
+    # Migraties voor bestaande databases
+    try:
+        conn.execute("ALTER TABLE grootboeken ADD COLUMN snelboeken INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass  # kolom bestaat al
     conn.close()
 
 def query(sql, params=(), one=False):
