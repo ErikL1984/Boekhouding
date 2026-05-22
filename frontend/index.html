@@ -606,6 +606,11 @@ tbody td.actions { white-space: nowrap; }
 // STATE & API
 // ════════════════════════════════════════════
 const S = { token: null, gebruiker: null, huidigePagina: null, wachtrijPagina: 0 };
+let _transSortVeld = 'datum';
+let _transSortVolgorde = 'desc';
+let _transOffset = 0;
+const _transLimit = 50;
+let _transTotaal = 0;
 
 async function api(method, path, body=null, isFile=false) {
   const opts = {
@@ -1105,11 +1110,27 @@ async function boekAfwijkend(transId, totaal) {
 async function renderTransacties() {
   const vandaag = new Date().toISOString().split('T')[0];
   const eersteJan = vandaag.slice(0,4) + '-01-01';
+  _transSortVeld = 'datum';
+  _transSortVolgorde = 'desc';
+  _transOffset = 0;
+
+  let rekeningen = [];
+  try { rekeningen = await get('/bankrekeningen'); } catch(e) {}
 
   document.getElementById('topbar-actions').innerHTML = `
-    <input type="date" id="filter-van" value="${eersteJan}" style="width:140px" onchange="laadTransacties()">
+    <input type="date" id="filter-van" value="${eersteJan}" style="width:140px" onchange="transFiltered()">
     <span class="text-faint">t/m</span>
-    <input type="date" id="filter-tot" value="${vandaag}" style="width:140px" onchange="laadTransacties()">
+    <input type="date" id="filter-tot" value="${vandaag}" style="width:140px" onchange="transFiltered()">
+    <select id="filter-status" onchange="transFiltered()" style="width:130px">
+      <option value="">Alle statussen</option>
+      <option value="nieuw">Te boeken</option>
+      <option value="geboekt">Geboekt</option>
+      <option value="handmatig">Handmatig</option>
+    </select>
+    <select id="filter-rekening" onchange="transFiltered()" style="width:160px">
+      <option value="">Alle rekeningen</option>
+      ${rekeningen.map(r => `<option value="${r.id}">${escHtml(r.naam)}</option>`).join('')}
+    </select>
   `;
 
   setContent(`
@@ -1118,21 +1139,53 @@ async function renderTransacties() {
         <div id="trans-tabel-wrap"><div class="flex-center" style="padding:40px"><div class="spinner"></div></div></div>
       </div>
     </div>
+    <div id="trans-paginering" style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px"></div>
   `);
+  laadTransacties();
+}
+
+function transFiltered() {
+  _transOffset = 0;
   laadTransacties();
 }
 
 async function laadTransacties() {
   const van = document.getElementById('filter-van')?.value || '';
   const tot = document.getElementById('filter-tot')?.value || '';
+  const status = document.getElementById('filter-status')?.value || '';
+  const rekening = document.getElementById('filter-rekening')?.value || '';
   const wrap = document.getElementById('trans-tabel-wrap');
   if (!wrap) return;
+
+  const params = new URLSearchParams({ van, tot, sorteer: _transSortVeld, volgorde: _transSortVolgorde, limit: _transLimit, offset: _transOffset });
+  if (status) params.set('status', status);
+  if (rekening) params.set('rekening_id', rekening);
+  const qs = params.toString();
+
   try {
-    const rows = await get(`/transacties/alle?van=${van}&tot=${tot}&limit=200`);
+    const [rows, countResult] = await Promise.all([
+      get(`/transacties/alle?${qs}`),
+      get(`/transacties/alle/count?${qs}`)
+    ]);
+    _transTotaal = countResult.count || 0;
+
+    const sortTh = (label, veld, uitlijning='') => {
+      const aktief = veld === _transSortVeld;
+      const pijl = aktief ? (_transSortVolgorde === 'asc' ? ' ▲' : ' ▼') : '';
+      return `<th style="cursor:pointer;user-select:none;${uitlijning}${aktief ? 'color:var(--blue-l);' : ''}" onclick="sorteerTransacties('${veld}')">${label}${pijl}</th>`;
+    };
+
     wrap.innerHTML = rows.length === 0
       ? '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Geen transacties gevonden</div></div>'
       : `<div class="table-wrap"><table>
-        <thead><tr><th>Datum</th><th>Rekening</th><th>Naam tegenpartij</th><th>Omschrijving</th><th style="text-align:right">Bedrag</th><th>Status</th></tr></thead>
+        <thead><tr>
+          ${sortTh('Datum', 'datum')}
+          <th>Rekening</th>
+          ${sortTh('Naam tegenpartij', 'naam_tegenpartij')}
+          ${sortTh('Omschrijving', 'omschrijving_1')}
+          ${sortTh('Bedrag', 'bedrag', 'text-align:right;')}
+          <th>Status</th>
+        </tr></thead>
         <tbody>${rows.map(t => `
           <tr>
             <td class="mono">${datumNL(t.datum)}</td>
@@ -1144,9 +1197,38 @@ async function laadTransacties() {
           </tr>`).join('')}
         </tbody>
       </table></div>`;
+
+    const pag = document.getElementById('trans-paginering');
+    if (pag) {
+      const vanNum = _transTotaal > 0 ? _transOffset + 1 : 0;
+      const totNum = Math.min(_transOffset + _transLimit, _transTotaal);
+      pag.innerHTML = `
+        <span class="text-sm text-faint">${_transTotaal > 0 ? `${vanNum}–${totNum} van ${_transTotaal} transacties` : 'Geen transacties'}</span>
+        <div class="btn-group">
+          <button class="btn btn-secondary btn-sm" onclick="pagTransacties(-1)" ${_transOffset === 0 ? 'disabled' : ''}>← Vorige</button>
+          <button class="btn btn-secondary btn-sm" onclick="pagTransacties(1)" ${totNum >= _transTotaal ? 'disabled' : ''}>Volgende →</button>
+        </div>
+      `;
+    }
   } catch(e) {
     wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
   }
+}
+
+function sorteerTransacties(veld) {
+  if (_transSortVeld === veld) {
+    _transSortVolgorde = _transSortVolgorde === 'desc' ? 'asc' : 'desc';
+  } else {
+    _transSortVeld = veld;
+    _transSortVolgorde = veld === 'datum' ? 'desc' : 'asc';
+  }
+  _transOffset = 0;
+  laadTransacties();
+}
+
+function pagTransacties(richting) {
+  _transOffset = Math.max(0, _transOffset + richting * _transLimit);
+  laadTransacties();
 }
 
 function statusBadge(s) {

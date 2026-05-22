@@ -236,13 +236,54 @@ def api_transacties_count():
     )
     return json_response({'count': row['count'] if row else 0})
 
+@app.route('/api/transacties/alle/count', methods=['GET'])
+@auth_required
+def api_transacties_alle_count():
+    datum_van = request.args.get('van', '')
+    datum_tot = request.args.get('tot', '')
+    status = request.args.get('status', '')
+    rekening_id = request.args.get('rekening_id', '')
+
+    sql = """SELECT COUNT(*) as count
+             FROM banktransacties t
+             LEFT JOIN bankrekeningen b ON REPLACE(b.iban,' ','') = t.iban
+             WHERE 1=1"""
+    params = []
+    if datum_van:
+        sql += " AND t.datum >= ?"
+        params.append(datum_van)
+    if datum_tot:
+        sql += " AND t.datum <= ?"
+        params.append(datum_tot)
+    if status:
+        sql += " AND t.status = ?"
+        params.append(status)
+    if rekening_id:
+        sql += " AND b.id = ?"
+        params.append(int(rekening_id))
+    row = database.query(sql, params, one=True)
+    return json_response({'count': row['count'] if row else 0})
+
 @app.route('/api/transacties/alle', methods=['GET'])
 @auth_required
 def api_transacties_alle():
-    limit = min(int(request.args.get('limit', 100)), 500)
+    limit = min(int(request.args.get('limit', 50)), 500)
     offset = int(request.args.get('offset', 0))
     datum_van = request.args.get('van', '')
     datum_tot = request.args.get('tot', '')
+    status = request.args.get('status', '')
+    rekening_id = request.args.get('rekening_id', '')
+    sorteer = request.args.get('sorteer', 'datum')
+    volgorde = request.args.get('volgorde', 'desc')
+
+    sorteer_velden = {
+        'datum': 't.datum',
+        'naam_tegenpartij': 't.naam_tegenpartij',
+        'omschrijving_1': 't.omschrijving_1',
+        'bedrag': 't.bedrag'
+    }
+    sorteer_col = sorteer_velden.get(sorteer, 't.datum')
+    volgorde_sql = 'ASC' if volgorde == 'asc' else 'DESC'
 
     sql = """SELECT t.*, b.naam as rekening_naam
              FROM banktransacties t
@@ -255,7 +296,13 @@ def api_transacties_alle():
     if datum_tot:
         sql += " AND t.datum <= ?"
         params.append(datum_tot)
-    sql += " ORDER BY t.datum DESC, t.id DESC LIMIT ? OFFSET ?"
+    if status:
+        sql += " AND t.status = ?"
+        params.append(status)
+    if rekening_id:
+        sql += " AND b.id = ?"
+        params.append(int(rekening_id))
+    sql += f" ORDER BY {sorteer_col} {volgorde_sql}, t.id {volgorde_sql} LIMIT ? OFFSET ?"
     params += [limit, offset]
 
     rows = database.query(sql, params)
