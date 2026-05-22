@@ -68,9 +68,24 @@ def evalueer_conditie(conditie: dict, transactie: dict) -> bool:
     if operator == 'LIKE':
         if waarde_trans is None:
             return False
-        return str(waarde_regel).lower() in str(waarde_trans).lower()
+        # Converteer SQL LIKE-patroon (% en _) naar regex
+        pattern = re.escape(str(waarde_regel))
+        pattern = pattern.replace(r'\%', '.*').replace(r'\_', '.')
+        return bool(re.fullmatch(pattern, str(waarde_trans), re.IGNORECASE))
+    elif operator == '=':
+        # Probeer numeriek; val terug op string-vergelijking
+        try:
+            trans_num = float(waarde_trans) if waarde_trans is not None else None
+            regel_num = float(waarde_regel)
+            if trans_num is None:
+                return False
+            return abs(trans_num - regel_num) < 0.005
+        except (TypeError, ValueError):
+            if waarde_trans is None:
+                return False
+            return str(waarde_trans).strip().lower() == str(waarde_regel).strip().lower()
     else:
-        # Numerieke vergelijking
+        # Numerieke vergelijking voor <, >, <=, >=
         try:
             trans_num = float(waarde_trans) if waarde_trans is not None else None
             regel_num = float(waarde_regel)
@@ -78,7 +93,6 @@ def evalueer_conditie(conditie: dict, transactie: dict) -> bool:
             return False
         if trans_num is None:
             return False
-        if operator == '=':  return abs(trans_num - regel_num) < 0.005
         if operator == '<':  return trans_num < regel_num
         if operator == '>':  return trans_num > regel_num
         if operator == '<=': return trans_num <= regel_num
