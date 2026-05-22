@@ -356,30 +356,111 @@ def api_boek_transactie(tid):
 
 # ─── BOEKINGEN ───────────────────────────────────────────────
 
-@app.route('/api/boekingen', methods=['GET'])
-@auth_required
-def api_boekingen():
-    datum_van = request.args.get('van', '')
-    datum_tot = request.args.get('tot', '')
-    gb_id = request.args.get('grootboek_id', '')
-    limit = min(int(request.args.get('limit', 100)), 500)
-
-    sql = """SELECT b.id, b.datum, b.omschrijving, b.type,
-                    t.bedrag, t.naam_tegenpartij, t.omschrijving_1
+def _boekingen_where(args):
+    """Bouw WHERE-clausule voor boekingen op basis van querystring parameters."""
+    sql = """SELECT b.id, b.datum, b.omschrijving, b.type, b.transactie_id,
+                    (SELECT COALESCE(SUM(br2.debet),0) FROM boekingsregels br2 WHERE br2.boeking_id=b.id) as totaal_bedrag,
+                    t.naam_tegenpartij
              FROM boekingen b
              LEFT JOIN banktransacties t ON t.id = b.transactie_id
              WHERE 1=1"""
     params = []
+    datum_van = args.get('van', '')
+    datum_tot = args.get('tot', '')
+    gb_id = args.get('grootboek_id', '')
+    omschrijving = args.get('omschrijving', '')
+    bedrag_van = args.get('bedrag_van', '')
+    bedrag_tot = args.get('bedrag_tot', '')
+    rekening = args.get('rekening', '')
+    tegenrekening = args.get('tegenrekening', '')
+
     if datum_van:
         sql += " AND b.datum >= ?"; params.append(datum_van)
     if datum_tot:
         sql += " AND b.datum <= ?"; params.append(datum_tot)
     if gb_id:
-        sql += " AND EXISTS (SELECT 1 FROM boekingsregels br WHERE br.boeking_id = b.id AND br.grootboek_id = ?)"
+        sql += " AND EXISTS (SELECT 1 FROM boekingsregels br WHERE br.boeking_id=b.id AND br.grootboek_id=?)"
         params.append(gb_id)
-    sql += f" ORDER BY b.datum DESC, b.id DESC LIMIT {limit}"
+    if omschrijving:
+        sql += " AND (b.omschrijving LIKE ? OR t.omschrijving_1 LIKE ?)"
+        params.extend([f'%{omschrijving}%', f'%{omschrijving}%'])
+    if bedrag_van:
+        sql += " AND (SELECT COALESCE(SUM(br2.debet),0) FROM boekingsregels br2 WHERE br2.boeking_id=b.id) >= ?"
+        params.append(float(bedrag_van))
+    if bedrag_tot:
+        sql += " AND (SELECT COALESCE(SUM(br2.debet),0) FROM boekingsregels br2 WHERE br2.boeking_id=b.id) <= ?"
+        params.append(float(bedrag_tot))
+    if rekening:
+        sql += """ AND EXISTS (SELECT 1 FROM boekingsregels br JOIN grootboeken g ON g.id=br.grootboek_id
+                               WHERE br.boeking_id=b.id AND (g.nummer LIKE ? OR g.omschrijving LIKE ?))"""
+        params.extend([f'%{rekening}%', f'%{rekening}%'])
+    if tegenrekening:
+        sql += """ AND EXISTS (SELECT 1 FROM boekingsregels br JOIN grootboeken g ON g.id=br.grootboek_id
+                               WHERE br.boeking_id=b.id AND (g.nummer LIKE ? OR g.omschrijving LIKE ?))"""
+        params.extend([f'%{tegenrekening}%', f'%{tegenrekening}%'])
+    return sql, params
+
+
+@app.route('/api/boekingen', methods=['GET'])
+@auth_required
+def api_boekingen():
+    limit = min(int(request.args.get('limit', 100)), 500)
+    offset = int(request.args.get('offset', 0))
+    sql, params = _boekingen_where(request.args)
+    sql += " ORDER BY b.datum DESC, b.id DESC LIMIT ? OFFSET ?"
+    params += [limit, offset]
     rows = database.query(sql, params)
     return json_response([dict(r) for r in rows])
+
+
+@app.route('/api/boekingen/count', methods=['GET'])
+@auth_required
+def api_boekingen_count():
+    sql, params = _boekingen_where(request.args)
+    count_sql = f"SELECT COUNT(*) as count FROM ({sql}) sub"
+    row = database.query(count_sql, params, one=True)
+    return json_response({'count': row['count'] if row else 0})
+
+
+@app.route('/api/boekingen', methods=['POST'])
+@auth_required
+def api_boeking_aanmaken():
+    data = request.json or {}
+    datum = data.get('datum', '')
+    omschrijving = data.get('omschrijving', '')
+    regels = data.get('regels', [])
+
+    if not datum:
+        return json_response({'error': 'Datum is verplicht'}, 400)
+    if len(regels) < 2:
+        return json_response({'error': 'Minimaal 2 boekingsregels vereist'}, 400)
+
+    totaal_debet = sum(float(r.get('debet', 0)) for r in regels)
+    totaal_credit = sum(float(r.get('credit', 0)) for r in regels)
+    if abs(totaal_debet - totaal_credit) > 0.005:
+        return json_response({'error': f'Debet ({totaal_debet:.2f}) en credit ({totaal_credit:.2f}) zijn niet in balans'}, 400)
+
+    from db import get_db
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO boekingen (omschrijving, datum, gebruiker_id, type) VALUES (?, ?, ?, 'normaal')",
+            (omschrijving, datum, g.gebruiker['id'])
+        )
+        bid = cur.lastrowid
+        for regel in regels:
+            conn.execute(
+                "INSERT INTO boekingsregels (boeking_id, grootboek_id, debet, credit, omschrijving) VALUES (?, ?, ?, ?, ?)",
+                (bid, regel['grootboek_id'], float(regel.get('debet', 0)), float(regel.get('credit', 0)), regel.get('omschrijving'))
+            )
+        conn.commit()
+        return json_response({'id': bid, 'bericht': 'Grootboekmutatie aangemaakt'}, 201)
+    except Exception as e:
+        conn.rollback()
+        return json_response({'error': str(e)}, 500)
+    finally:
+        conn.close()
+
 
 @app.route('/api/boekingen/<int:bid>', methods=['GET'])
 @auth_required
@@ -393,6 +474,59 @@ def api_boeking_detail(bid):
            WHERE br.boeking_id = ?""", (bid,)
     )
     return json_response({**dict(boeking), 'regels': [dict(r) for r in regels]})
+
+
+@app.route('/api/boekingen/<int:bid>', methods=['PUT'])
+@auth_required
+def api_boeking_update(bid):
+    boeking = database.query("SELECT * FROM boekingen WHERE id = ?", (bid,), one=True)
+    if not boeking:
+        return json_response({'error': 'Niet gevonden'}, 404)
+
+    data = request.json or {}
+    datum = data.get('datum', '')
+    omschrijving = data.get('omschrijving', '')
+    regels = data.get('regels', [])
+
+    if not datum:
+        return json_response({'error': 'Datum is verplicht'}, 400)
+    if len(regels) < 2:
+        return json_response({'error': 'Minimaal 2 boekingsregels vereist'}, 400)
+
+    totaal_debet = sum(float(r.get('debet', 0)) for r in regels)
+    totaal_credit = sum(float(r.get('credit', 0)) for r in regels)
+    if abs(totaal_debet - totaal_credit) > 0.005:
+        return json_response({'error': f'Debet ({totaal_debet:.2f}) en credit ({totaal_credit:.2f}) zijn niet in balans'}, 400)
+
+    from db import get_db
+    conn = get_db()
+    try:
+        conn.execute("UPDATE boekingen SET datum=?, omschrijving=? WHERE id=?", (datum, omschrijving, bid))
+        conn.execute("DELETE FROM boekingsregels WHERE boeking_id=?", (bid,))
+        for regel in regels:
+            conn.execute(
+                "INSERT INTO boekingsregels (boeking_id, grootboek_id, debet, credit, omschrijving) VALUES (?, ?, ?, ?, ?)",
+                (bid, regel['grootboek_id'], float(regel.get('debet', 0)), float(regel.get('credit', 0)), regel.get('omschrijving'))
+            )
+        conn.commit()
+        return json_response({'bericht': 'Bijgewerkt'})
+    except Exception as e:
+        conn.rollback()
+        return json_response({'error': str(e)}, 500)
+    finally:
+        conn.close()
+
+
+@app.route('/api/boekingen/<int:bid>', methods=['DELETE'])
+@auth_required
+def api_boeking_verwijderen(bid):
+    boeking = database.query("SELECT * FROM boekingen WHERE id = ?", (bid,), one=True)
+    if not boeking:
+        return json_response({'error': 'Niet gevonden'}, 404)
+    if boeking['transactie_id']:
+        database.execute("UPDATE banktransacties SET status='nieuw' WHERE id=?", (boeking['transactie_id'],))
+    database.execute("DELETE FROM boekingen WHERE id=?", (bid,))
+    return json_response({'bericht': 'Verwijderd'})
 
 # Openingsbalans
 @app.route('/api/openingsbalans', methods=['POST'])
