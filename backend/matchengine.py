@@ -68,10 +68,10 @@ def evalueer_conditie(conditie: dict, transactie: dict) -> bool:
     if operator == 'LIKE':
         if waarde_trans is None:
             return False
-        # Converteer SQL LIKE-patroon (% en _) naar regex
-        pattern = re.escape(str(waarde_regel))
-        pattern = pattern.replace(r'\%', '.*').replace(r'\_', '.')
-        return bool(re.fullmatch(pattern, str(waarde_trans), re.IGNORECASE))
+        # Verwijder % wildcards (worden als 'bevat' geïnterpreteerd)
+        zoekterm = str(waarde_regel).replace('%', '').strip().lower()
+        haystack = str(waarde_trans).strip().lower()
+        return zoekterm in haystack
     elif operator == '=':
         # Probeer numeriek; val terug op string-vergelijking
         try:
