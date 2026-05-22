@@ -1,6 +1,7 @@
 """
 Matchregel engine — parseren en evalueren van matchregels
 Syntax: BEDRAG < -50 AND NAAM LIKE 'jumbo'
+        NAAM = 'BCK*Jumbo v.Daalhuizen'
         BEDRAG = -50.99 OR OMSCHRIJVING LIKE 'sparen auto'
 """
 import re
@@ -12,13 +13,10 @@ VELD_MAP = {
     'OMSCHRIJVING': 'omschrijving_1',
 }
 
+TEKSTVELDEN = {'NAAM', 'OMSCHRIJVING'}
 OPERATOREN = ['<=', '>=', '<', '>', '=', 'LIKE']
 
 def parse_conditie(conditie_str: str) -> dict:
-    """
-    Verwerk een conditiestring naar structuur.
-    Returns: { 'veld': ..., 'operator': ..., 'waarde': ... }
-    """
     conditie_str = conditie_str.strip()
     for op in OPERATOREN:
         pat = rf"^(BEDRAG|NAAM|OMSCHRIJVING)\s+{re.escape(op)}\s+(.+)$"
@@ -26,7 +24,6 @@ def parse_conditie(conditie_str: str) -> dict:
         if m:
             veld = m.group(1).upper()
             waarde_raw = m.group(2).strip()
-            # Verwijder aanhalingstekens bij string-waarden
             if waarde_raw.startswith("'") and waarde_raw.endswith("'"):
                 waarde = waarde_raw[1:-1]
             else:
@@ -38,12 +35,7 @@ def parse_conditie(conditie_str: str) -> dict:
     raise ValueError(f"Ongeldige conditie: {conditie_str}")
 
 def parse_regel(regel_str: str) -> dict:
-    """
-    Verwerk een volledige regelstring naar structuur.
-    Returns: { 'conditie1': {...}, 'logisch': 'AND'|'OR'|None, 'conditie2': {...}|None }
-    """
     regel_str = regel_str.strip()
-    # Zoek AND/OR op woordgrens
     split = re.split(r'\s+(AND|OR)\s+', regel_str, maxsplit=1, flags=re.IGNORECASE)
     if len(split) == 3:
         c1_str, logisch, c2_str = split
@@ -64,39 +56,34 @@ def evalueer_conditie(conditie: dict, transactie: dict) -> bool:
     waarde_trans = transactie.get(veld)
     operator = conditie['operator']
     waarde_regel = conditie['waarde']
+    is_tekstveld = conditie['veld'] in TEKSTVELDEN
 
+    # LIKE: altijd tekstueel, % wildcards worden genegeerd (alles is 'bevat')
     if operator == 'LIKE':
+        if not waarde_trans:
+            return False
+        zoekterm = str(waarde_regel).replace('%', '').strip().lower()
+        return zoekterm in str(waarde_trans).strip().lower()
+
+    # = op tekstveld: tekstuele vergelijking (niet hoofdlettergevoelig)
+    if operator == '=' and is_tekstveld:
         if waarde_trans is None:
             return False
-        # Verwijder % wildcards (worden als 'bevat' geïnterpreteerd)
-        zoekterm = str(waarde_regel).replace('%', '').strip().lower()
-        haystack = str(waarde_trans).strip().lower()
-        return zoekterm in haystack
-    elif operator == '=':
-        # Probeer numeriek; val terug op string-vergelijking
-        try:
-            trans_num = float(waarde_trans) if waarde_trans is not None else None
-            regel_num = float(waarde_regel)
-            if trans_num is None:
-                return False
-            return abs(trans_num - regel_num) < 0.005
-        except (TypeError, ValueError):
-            if waarde_trans is None:
-                return False
-            return str(waarde_trans).strip().lower() == str(waarde_regel).strip().lower()
-    else:
-        # Numerieke vergelijking voor <, >, <=, >=
-        try:
-            trans_num = float(waarde_trans) if waarde_trans is not None else None
-            regel_num = float(waarde_regel)
-        except (TypeError, ValueError):
-            return False
-        if trans_num is None:
-            return False
-        if operator == '<':  return trans_num < regel_num
-        if operator == '>':  return trans_num > regel_num
-        if operator == '<=': return trans_num <= regel_num
-        if operator == '>=': return trans_num >= regel_num
+        return str(waarde_regel).strip().lower() == str(waarde_trans).strip().lower()
+
+    # Numerieke vergelijking (BEDRAG, of getallen)
+    try:
+        trans_num = float(waarde_trans) if waarde_trans is not None else None
+        regel_num = float(waarde_regel)
+    except (TypeError, ValueError):
+        return False
+    if trans_num is None:
+        return False
+    if operator == '=':  return abs(trans_num - regel_num) < 0.005
+    if operator == '<':  return trans_num < regel_num
+    if operator == '>':  return trans_num > regel_num
+    if operator == '<=': return trans_num <= regel_num
+    if operator == '>=': return trans_num >= regel_num
     return False
 
 def evalueer_regel(regel_str: str, transactie: dict) -> bool:
@@ -114,7 +101,6 @@ def evalueer_regel(regel_str: str, transactie: dict) -> bool:
         return False
 
 def valideer_conditie_syntax(conditie_str: str) -> tuple[bool, str]:
-    """Valideer een conditiestring. Returns (geldig, foutmelding)"""
     try:
         parse_regel(conditie_str)
         return True, ""
@@ -123,10 +109,9 @@ def valideer_conditie_syntax(conditie_str: str) -> tuple[bool, str]:
 
 def zoek_match(transactie: dict, matchregels: list) -> Optional[dict]:
     """
-    Zoek welke matchregel van toepassing is op de transactie.
-    - 0 matches → None
-    - 1 match   → return die matchregel
-    - 2+ matches → None (handmatig boeken)
+    0 matches  → None (handmatig)
+    1 match    → return die matchregel
+    2+ matches → None (handmatig, want ambigu)
     """
     matches = []
     for regel in matchregels:
@@ -134,4 +119,4 @@ def zoek_match(transactie: dict, matchregels: list) -> Optional[dict]:
             matches.append(regel)
     if len(matches) == 1:
         return matches[0]
-    return None  # 0 of 2+ → handmatig
+    return None
