@@ -568,6 +568,7 @@ tbody td.actions { white-space: nowrap; }
       <div class="nav-item" onclick="nav('import')"><span class="icon">⬆</span> Importeren</div>
       <div class="nav-item" onclick="nav('wachtrij')"><span class="icon">⏳</span> Te boeken <span id="wachtrij-badge" class="badge badge-amber" style="margin-left:auto"></span></div>
       <div class="nav-item" onclick="nav('transacties')"><span class="icon">≡</span> Alle transacties</div>
+      <div class="nav-item" onclick="nav('mutaties')"><span class="icon">✎</span> Grootboekmutaties</div>
 
       <div class="nav-section">Rapportages</div>
       <div class="nav-item" onclick="nav('balans')"><span class="icon">⚖</span> Balans</div>
@@ -682,7 +683,8 @@ document.getElementById('login-pass').addEventListener('keydown', e => {
 // ════════════════════════════════════════════
 const PAGINA_TITELS = {
   dashboard: 'Dashboard', import: 'Importeren', wachtrij: 'Te boeken',
-  transacties: 'Alle transacties', balans: 'Balans', wenv: 'Winst & Verlies',
+  transacties: 'Alle transacties', mutaties: 'Grootboekmutaties',
+  balans: 'Balans', wenv: 'Winst & Verlies',
   maand: 'Maandoverzicht', grootboeken: 'Grootboekrekeningen', bankrekeningen: 'Bankrekeningen',
   matchregels: 'Matchregels', budgetten: 'Budgetten', openingsbalans: 'Openingsbalans',
   gebruikers: 'Gebruikersbeheer'
@@ -690,7 +692,8 @@ const PAGINA_TITELS = {
 
 const PAGINA_RENDERERS = {
   dashboard: renderDashboard, import: renderImport, wachtrij: renderWachtrij,
-  transacties: renderTransacties, balans: renderBalans, wenv: renderWenv,
+  transacties: renderTransacties, mutaties: renderMutaties,
+  balans: renderBalans, wenv: renderWenv,
   maand: renderMaand, grootboeken: renderGrootboeken, bankrekeningen: renderBankrekeningen,
   matchregels: renderMatchregels, budgetten: renderBudgetten, openingsbalans: renderOpeningsbalans,
   gebruikers: renderGebruikers
@@ -2011,6 +2014,318 @@ async function deactiveerGebruiker(id, naam) {
   if (!confirm(`Gebruiker "${naam}" deactiveren?`)) return;
   try { await put(`/gebruikers/${id}`, { actief: 0 }); toast('Gedeactiveerd', 'success'); laadGebruikers(); }
   catch(e) { toast(e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════
+// GROOTBOEKMUTATIES
+// ════════════════════════════════════════════
+let _mutatiesOffset = 0;
+const _mutatiesLimit = 50;
+let _mutatiesGb = [];
+
+async function renderMutaties() {
+  document.getElementById('topbar-actions').innerHTML = `
+    <button class="btn btn-primary" onclick="openMutatieModal()">+ Nieuwe mutatie</button>
+  `;
+  const vandaag = new Date().toISOString().split('T')[0];
+  const eersteJan = vandaag.slice(0,4) + '-01-01';
+  _mutatiesOffset = 0;
+
+  setContent(`
+    <div class="card mb-20">
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:12px">
+          <div>
+            <label>Datum van</label>
+            <input type="date" id="mut-van" value="${eersteJan}" onchange="mutatiesFiltered()">
+          </div>
+          <div>
+            <label>Datum t/m</label>
+            <input type="date" id="mut-tot" value="${vandaag}" onchange="mutatiesFiltered()">
+          </div>
+          <div>
+            <label>Bedrag van (€)</label>
+            <input type="number" step="0.01" id="mut-bedrag-van" placeholder="0,00" onchange="mutatiesFiltered()">
+          </div>
+          <div>
+            <label>Bedrag t/m (€)</label>
+            <input type="number" step="0.01" id="mut-bedrag-tot" placeholder="9999,99" onchange="mutatiesFiltered()">
+          </div>
+          <div>
+            <label>Omschrijving</label>
+            <input type="text" id="mut-omschr" placeholder="Zoeken..." oninput="mutatiesFiltered()">
+          </div>
+          <div>
+            <label>Rekeningnummer</label>
+            <input type="text" id="mut-rekening" placeholder="Nr. of naam..." oninput="mutatiesFiltered()">
+          </div>
+          <div>
+            <label>Tegenrekening</label>
+            <input type="text" id="mut-tegenrek" placeholder="Nr. of naam..." oninput="mutatiesFiltered()">
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:8px">
+            <button class="btn btn-secondary" onclick="resetMutatiesFilter()">Wissen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body" style="padding:0">
+        <div id="mutaties-tabel-wrap"><div class="flex-center" style="padding:40px"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+    <div id="mutaties-paginering" style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px"></div>
+  `);
+
+  try { _mutatiesGb = await get('/grootboeken'); } catch(e) { _mutatiesGb = []; }
+  laadMutaties();
+}
+
+function mutatiesFiltered() {
+  _mutatiesOffset = 0;
+  laadMutaties();
+}
+
+function resetMutatiesFilter() {
+  const vandaag = new Date().toISOString().split('T')[0];
+  const eersteJan = vandaag.slice(0,4) + '-01-01';
+  document.getElementById('mut-van').value = eersteJan;
+  document.getElementById('mut-tot').value = vandaag;
+  document.getElementById('mut-bedrag-van').value = '';
+  document.getElementById('mut-bedrag-tot').value = '';
+  document.getElementById('mut-omschr').value = '';
+  document.getElementById('mut-rekening').value = '';
+  document.getElementById('mut-tegenrek').value = '';
+  mutatiesFiltered();
+}
+
+function getMutatiesParams() {
+  const params = new URLSearchParams();
+  const van = document.getElementById('mut-van')?.value;
+  const tot = document.getElementById('mut-tot')?.value;
+  const bedragVan = document.getElementById('mut-bedrag-van')?.value;
+  const bedragTot = document.getElementById('mut-bedrag-tot')?.value;
+  const omschr = document.getElementById('mut-omschr')?.value;
+  const rekening = document.getElementById('mut-rekening')?.value;
+  const tegenrek = document.getElementById('mut-tegenrek')?.value;
+  if (van) params.set('van', van);
+  if (tot) params.set('tot', tot);
+  if (bedragVan) params.set('bedrag_van', bedragVan);
+  if (bedragTot) params.set('bedrag_tot', bedragTot);
+  if (omschr) params.set('omschrijving', omschr);
+  if (rekening) params.set('rekening', rekening);
+  if (tegenrek) params.set('tegenrekening', tegenrek);
+  return params;
+}
+
+async function laadMutaties() {
+  const wrap = document.getElementById('mutaties-tabel-wrap');
+  if (!wrap) return;
+
+  const params = getMutatiesParams();
+  params.set('limit', _mutatiesLimit);
+  params.set('offset', _mutatiesOffset);
+  const qs = params.toString();
+  const countQs = getMutatiesParams().toString();
+
+  try {
+    const [rows, countResult] = await Promise.all([
+      get(`/boekingen?${qs}`),
+      get(`/boekingen/count?${countQs}`)
+    ]);
+    const totaal = countResult.count || 0;
+
+    const typeBadge = (t) => {
+      if (t === 'opening') return '<span class="badge badge-blue">Opening</span>';
+      if (t === 'intern') return '<span class="badge badge-teal">Intern</span>';
+      return '<span class="badge badge-gray">Normaal</span>';
+    };
+
+    wrap.innerHTML = rows.length === 0
+      ? '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Geen mutaties gevonden</div></div>'
+      : `<div class="table-wrap"><table>
+        <thead><tr>
+          <th>ID</th><th>Datum</th><th>Omschrijving</th><th style="text-align:right">Bedrag</th><th>Type</th><th>Acties</th>
+        </tr></thead>
+        <tbody>${rows.map(m => `
+          <tr>
+            <td class="mono text-faint">#${m.id}</td>
+            <td class="mono">${datumNL(m.datum)}</td>
+            <td class="bold">${escHtml(m.omschrijving || m.naam_tegenpartij || '—')}</td>
+            <td class="mono text-right ${m.totaal_bedrag > 0 ? 'pos' : ''}">${euro(m.totaal_bedrag)}</td>
+            <td>${typeBadge(m.type)}</td>
+            <td class="actions">
+              <button class="btn btn-secondary btn-xs" onclick="openMutatieModal(${m.id})">Bewerken</button>
+              <button class="btn btn-danger btn-xs" onclick="verwijderMutatie(${m.id})">Verwijderen</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+
+    const pag = document.getElementById('mutaties-paginering');
+    if (pag) {
+      const vanNum = totaal > 0 ? _mutatiesOffset + 1 : 0;
+      const totNum = Math.min(_mutatiesOffset + _mutatiesLimit, totaal);
+      pag.innerHTML = `
+        <span class="text-sm text-faint">${totaal > 0 ? `${vanNum}–${totNum} van ${totaal} mutaties` : 'Geen mutaties'}</span>
+        <div class="btn-group">
+          <button class="btn btn-secondary btn-sm" onclick="pagMutaties(-1)" ${_mutatiesOffset === 0 ? 'disabled' : ''}>← Vorige</button>
+          <button class="btn btn-secondary btn-sm" onclick="pagMutaties(1)" ${totNum >= totaal ? 'disabled' : ''}>Volgende →</button>
+        </div>
+      `;
+    }
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+function pagMutaties(richting) {
+  _mutatiesOffset = Math.max(0, _mutatiesOffset + richting * _mutatiesLimit);
+  laadMutaties();
+}
+
+let _mutatieRegelTeller = 0;
+
+function mutatieRegelHtml(gbLijst, idx, regel = null) {
+  const opties = gbLijst.map(g => `<option value="${g.id}" ${regel?.grootboek_id===g.id?'selected':''}>${escHtml(g.nummer)} — ${escHtml(g.omschrijving)}</option>`).join('');
+  return `
+    <div class="split-regel" id="msr-${idx}" style="grid-template-columns:1fr 120px 120px 32px">
+      <select onchange="updateMutatieTotalen()">${opties}</select>
+      <input type="number" step="0.01" min="0" placeholder="Debet" class="mono" value="${regel?.debet||''}"
+             data-type="debet" oninput="updateMutatieTotalen()">
+      <input type="number" step="0.01" min="0" placeholder="Credit" class="mono" value="${regel?.credit||''}"
+             data-type="credit" oninput="updateMutatieTotalen()">
+      <button class="btn btn-danger btn-icon" onclick="document.getElementById('msr-${idx}').remove();updateMutatieTotalen()">✕</button>
+    </div>
+  `;
+}
+
+function updateMutatieTotalen() {
+  const regels = document.querySelectorAll('#mutatie-regels .split-regel');
+  let totDebet = 0, totCredit = 0;
+  regels.forEach(r => {
+    const inputs = r.querySelectorAll('input[type=number]');
+    totDebet += parseFloat(inputs[0]?.value) || 0;
+    totCredit += parseFloat(inputs[1]?.value) || 0;
+  });
+  const debEl = document.getElementById('mut-tot-debet');
+  const crEl = document.getElementById('mut-tot-credit');
+  const foutEl = document.getElementById('mutatie-fout');
+  if (debEl) debEl.textContent = euro(totDebet);
+  if (crEl) crEl.textContent = euro(totCredit);
+  const inBalans = Math.abs(totDebet - totCredit) < 0.005;
+  if (debEl) debEl.style.color = inBalans ? 'var(--teal-l)' : 'var(--amber)';
+  if (crEl) crEl.style.color = inBalans ? 'var(--teal-l)' : 'var(--amber)';
+  if (foutEl && inBalans) foutEl.textContent = '';
+}
+
+async function openMutatieModal(bid = null) {
+  const gb = _mutatiesGb.length ? _mutatiesGb : await get('/grootboeken');
+  const isNieuw = bid === null;
+  let boeking = null;
+
+  if (!isNieuw) {
+    try { boeking = await get(`/boekingen/${bid}`); } catch(e) { toast(e.message, 'error'); return; }
+  }
+
+  const vandaag = new Date().toISOString().split('T')[0];
+  _mutatieRegelTeller = 0;
+
+  const initieleRegels = boeking?.regels?.length
+    ? boeking.regels.map(r => mutatieRegelHtml(gb, _mutatieRegelTeller++, r)).join('')
+    : mutatieRegelHtml(gb, _mutatieRegelTeller++) + mutatieRegelHtml(gb, _mutatieRegelTeller++);
+
+  openModal(`
+    <div class="modal-header">
+      <span class="modal-title">${isNieuw ? 'Nieuwe grootboekmutatie' : 'Mutatie bewerken #' + bid}</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Datum</label>
+          <input type="date" id="mut-datum" value="${boeking?.datum || vandaag}">
+        </div>
+        <div class="form-group">
+          <label>Omschrijving</label>
+          <input type="text" id="mut-omschr-input" value="${escHtml(boeking?.omschrijving||'')}" placeholder="Optionele omschrijving">
+        </div>
+      </div>
+      <div style="font-size:0.78rem;font-weight:600;color:var(--text2);margin-bottom:8px;display:grid;grid-template-columns:1fr 120px 120px 32px;gap:8px;padding:0 2px">
+        <span>Grootboekrekening</span><span>Debet (€)</span><span>Credit (€)</span><span></span>
+      </div>
+      <div class="split-regels" id="mutatie-regels">
+        ${initieleRegels}
+      </div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:8px"
+              onclick="voegMutatieRegelToe()">+ Regel toevoegen</button>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;margin-top:10px;border-top:1px solid var(--border);font-size:0.83rem">
+        <span class="text-muted">Totaal debet: <strong id="mut-tot-debet">—</strong></span>
+        <span class="text-muted">Totaal credit: <strong id="mut-tot-credit">—</strong></span>
+      </div>
+      <div class="form-error" id="mutatie-fout"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuleren</button>
+      <button class="btn btn-primary" onclick="slaMutatieOp(${bid || 'null'})">${isNieuw ? 'Aanmaken' : 'Opslaan'}</button>
+    </div>
+  `, 'modal-lg');
+  updateMutatieTotalen();
+}
+
+function voegMutatieRegelToe() {
+  const gb = _mutatiesGb;
+  _mutatieRegelTeller++;
+  const container = document.getElementById('mutatie-regels');
+  const div = document.createElement('div');
+  div.innerHTML = mutatieRegelHtml(gb, _mutatieRegelTeller);
+  container.appendChild(div.firstElementChild);
+}
+
+async function slaMutatieOp(bid) {
+  const datum = document.getElementById('mut-datum')?.value;
+  const omschrijving = document.getElementById('mut-omschr-input')?.value.trim();
+  const foutEl = document.getElementById('mutatie-fout');
+
+  const regels = [...document.querySelectorAll('#mutatie-regels .split-regel')].map(el => {
+    const inputs = el.querySelectorAll('input[type=number]');
+    return {
+      grootboek_id: parseInt(el.querySelector('select').value),
+      debet: parseFloat(inputs[0]?.value) || 0,
+      credit: parseFloat(inputs[1]?.value) || 0
+    };
+  }).filter(r => r.debet > 0 || r.credit > 0);
+
+  if (!datum) { foutEl.textContent = 'Datum is verplicht'; return; }
+  if (regels.length < 2) { foutEl.textContent = 'Minimaal 2 boekingsregels vereist'; return; }
+
+  const totDebet = regels.reduce((s,r) => s + r.debet, 0);
+  const totCredit = regels.reduce((s,r) => s + r.credit, 0);
+  if (Math.abs(totDebet - totCredit) > 0.005) {
+    foutEl.textContent = `Debet (${euro(totDebet)}) en credit (${euro(totCredit)}) zijn niet in balans`;
+    return;
+  }
+
+  try {
+    const data = { datum, omschrijving, regels };
+    if (bid) await put(`/boekingen/${bid}`, data);
+    else await post('/boekingen', data);
+    closeModal();
+    toast(bid ? 'Mutatie bijgewerkt' : 'Mutatie aangemaakt', 'success');
+    laadMutaties();
+  } catch(e) {
+    foutEl.textContent = e.message;
+  }
+}
+
+async function verwijderMutatie(bid) {
+  if (!confirm(`Mutatie #${bid} verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
+  try {
+    await del(`/boekingen/${bid}`);
+    toast('Mutatie verwijderd', 'success');
+    laadMutaties();
+    refreshWachtrijBadge();
+  } catch(e) { toast(e.message, 'error'); }
 }
 </script>
 </body>
