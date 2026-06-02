@@ -285,9 +285,10 @@ def api_transacties_alle():
     sorteer_col = sorteer_velden.get(sorteer, 't.datum')
     volgorde_sql = 'ASC' if volgorde == 'asc' else 'DESC'
 
-    sql = """SELECT t.*, b.naam as rekening_naam
+    sql = """SELECT t.*, b.naam as rekening_naam, bk.id as boeking_id
              FROM banktransacties t
              LEFT JOIN bankrekeningen b ON REPLACE(b.iban,' ','') = t.iban
+             LEFT JOIN boekingen bk ON bk.transactie_id = t.id
              WHERE 1=1"""
     params = []
     if datum_van:
